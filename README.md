@@ -1,5 +1,7 @@
 # Death Tracker
 
+![Death Tracker: the death card names what killed you](docs/curseforge/banner.png)
+
 Counts your deaths and shows what killed you. For WoW: Forever.
 
 - See what killed you on a death card, with a joke to match.
