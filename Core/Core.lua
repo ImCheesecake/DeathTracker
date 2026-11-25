@@ -44,13 +44,20 @@ ns.CAUSES = { { "mob", "Mobs" }, { "player", "Players" }, { "fall", "Falls" }, {
 local OTHER = { self = true, unknown = true, other = true }
 function ns.CauseKind(cause) return OTHER[cause] and "other" or cause end
 
--- Forever's realm names end in their ruleset ("CAMWOWEU5Realm8PvP"); so does a character's key.
-function ns.Ruleset(charKey) return charKey and charKey:match("%d(%a+)$") end
+-- Forever's realm names end in their ruleset ("CAMWOWEU5Realm8PvP"); a key saved without one ends in the
+-- ruleset itself ("-RP-PvP"). Character names can't hold a hyphen.
+local RULESETS = { PvE = true, PvP = true, RP = true, ["RP-PvP"] = true }
+function ns.Ruleset(charKey)
+    if not charKey then return nil end
+    local tail = charKey:match("%-([%a%-]+)$")
+    return charKey:match("%d(%a+)$") or (RULESETS[tail] and tail) or nil
+end
 
 local function matches(d, f, since)
     return d.time >= since
         and (not f.char or d.char == f.char)
         and (not f.name or d.name == f.name)
+        and (f.gone == nil or ((d.char or ""):find("#%d+%-") ~= nil) == f.gone)
         and (not f.cause or ns.CauseKind(d.cause) == f.cause)
         and (not f.causes or f.causes[ns.CauseKind(d.cause)])
         and (not f.ruleset or ns.Ruleset(d.char) == f.ruleset)
@@ -444,34 +451,36 @@ local function onDead()
     C_Timer.After(RECAP_WAIT, function() readRecap(at, false) end)
 end
 
--- Forever's realm name can come back empty (GetRealmName() too). Forever refuses a name taken on
--- the other ruleset, so a name is one character.
-local function realmOf(name)
-    local realm = GetNormalizedRealmName()
-    if realm and realm ~= "" then
-        ns.db.realms[name] = realm
-        return realm
-    end
-    if ns.db.realms[name] then return ns.db.realms[name] end
-    for key, c in pairs(ns.db.characters) do
-        local known = key:sub(#name + 2)
-        if c.name == name and key:sub(1, #name + 1) == name .. "-" and known ~= "" then return known end
-    end
-    return ""
+-- Forever has no realms, only rulesets: GetRealmName() gives "" or a layer's name, GetRealmID() 0. A
+-- character is its name and the ruleset the game rules say, so a layer never splits one.
+local function rulesetOf()
+    local pvp = C_GameRules.IsGameRuleActive(Enum.GameRule.PvPRuleset)
+    local rp = C_GameRules.IsGameRuleActive(Enum.GameRule.RPRuleset)
+    if rp then return pvp and "RP-PvP" or "RP" end
+    return pvp and "PvP" or "PvE"
 end
 
-local function adopt(from, to)
-    local old, new = ns.db.characters[from], ns.db.characters[to]
-    ns.db.characters[from] = nil
-    local last = { [from] = 0, [to] = 0 }
-    for _, d in ipairs(ns.db.deaths) do
-        if last[d.char] then last[d.char] = math.max(last[d.char], d.time or 0) end
+-- Keys saved before 1.7.2 end in a layer's name, which ends in the ruleset.
+local function keyOf(name, ruleset)
+    local found
+    for key in pairs(ns.db.characters) do
+        if key:sub(1, #name + 1) == name .. "-" and ns.Ruleset(key) == ruleset and (not found or key < found) then found = key end
     end
-    if last[from] > last[to] then
-        new.alive = old.alive or 0
-    elseif last[from] == 0 then
-        new.alive = (new.alive or 0) + (old.alive or 0)
+    return found or name .. "-" .. ruleset
+end
+
+local function onlyKey(name, except)
+    local found
+    for key in pairs(ns.db.characters) do
+        if key ~= except and key:sub(1, #name + 1) == name .. "-" and ns.Ruleset(key) then
+            if found then return nil end
+            found = key
+        end
     end
+    return found
+end
+
+local function rekey(from, to)
     for _, list in ipairs({ ns.db.deaths, ns.db.escapes, ns.db.bounties, ns.db.trophyFacts }) do
         for _, e in ipairs(list) do
             if e.char == from then e.char = to end
@@ -488,24 +497,60 @@ local function adopt(from, to)
     end
 end
 
-local function adoptAll()
+local function adopt(from, to)
+    local old, new = ns.db.characters[from], ns.db.characters[to]
+    ns.db.characters[from] = nil
+    local last = { [from] = 0, [to] = 0 }
+    for _, d in ipairs(ns.db.deaths) do
+        if last[d.char] then last[d.char] = math.max(last[d.char], d.time or 0) end
+    end
+    if last[from] > last[to] then
+        new.alive = old.alive or 0
+    elseif last[from] == 0 then
+        new.alive = (new.alive or 0) + (old.alive or 0)
+    end
+    rekey(from, to)
+end
+
+-- A deleted character's name can be taken again, by a new character with a new GUID.
+local function retire(key, c)
+    c.deleted = time()
+    local to = ("%s#%d-%s"):format(c.name, c.deleted, key:sub(#c.name + 2))
+    ns.db.characters[key], ns.db.characters[to] = nil, c
+    rekey(key, to)
+end
+
+-- Another copy of a character: saved with no realm (1.6.x), or on the same ruleset under another layer.
+-- Another character's copy with no realm goes to its one other key; with two it can't tell which.
+local function adoptAll(name, ruleset)
+    local found = {}
     for key, c in pairs(ns.db.characters) do
-        if c.name and key == c.name .. "-" then
-            local realm = ns.db.realms[c.name]
-            for full, other in pairs(ns.db.characters) do
-                if not realm and other.name == c.name and full ~= key then realm = full:sub(#key + 1) end
+        if key ~= charKey and c.name and not c.deleted then
+            if c.name == name and (key == name .. "-" or ns.Ruleset(key) == ruleset) then
+                found[#found + 1] = { key, charKey }
+            elseif key == c.name .. "-" and onlyKey(c.name, key) then
+                found[#found + 1] = { key, onlyKey(c.name, key) }
             end
-            if realm and ns.db.characters[key .. realm] then adopt(key, key .. realm) end
         end
+    end
+    for _, pair in ipairs(found) do
+        local from, to = ns.db.characters[pair[1]], ns.db.characters[pair[2]]
+        if from.guid and to.guid and from.guid ~= to.guid then retire(pair[1], from) else adopt(pair[1], pair[2]) end
     end
 end
 
 local function onEnterWorld()
     local name = NameUtil.GetFullNameWithoutRealm(UnitName("player"))
-    charKey = name .. "-" .. realmOf(name)
+    local guid = UnitGUID("player")
+    if guid and not canaccessvalue(guid) then guid = nil end
+    local ruleset = rulesetOf()
+    charKey = keyOf(name, ruleset)
+    local old = ns.db.characters[charKey]
+    if old and guid and old.guid and old.guid ~= guid then retire(charKey, old) end
     char = ns.db.characters[charKey] or { alive = 0 }
     ns.db.characters[charKey] = char
-    adoptAll()
+    char.guid, char.name = guid or char.guid, name
+    adoptAll(name, ruleset)
     char.name, char.level, char.faction = name, UnitLevel("player"), UnitFactionGroup("player")
     char.class = select(2, UnitClass("player"))
     ready = not UnitIsDeadOrGhost("player")
@@ -536,7 +581,7 @@ events:SetScript("OnEvent", function(_, event, ...)
         db.escapes = db.escapes or {}
         db.payments = db.payments or {}
         db.trophyFacts = db.trophyFacts or {}
-        db.realms = db.realms or {}
+        db.realms = nil
         db.settings = db.settings or {}
         for k, v in pairs(ns.DEFAULTS) do
             if db.settings[k] == nil then db.settings[k] = v end

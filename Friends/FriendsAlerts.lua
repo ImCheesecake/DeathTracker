@@ -16,6 +16,9 @@ local SMALL, SMALL_BUTTON, SMALL_MAX, CARD, CARD_MAX, PAD, CLOSE = 420, 580, 700
 local BUTTON_W, BUTTON_H, ICON, ICON_GAP, EDGE = 120, 26, 52, 10, 14
 FA.RESPECTS_ICON = "Interface\\Icons\\INV_Misc_Candle_03"
 FA.DEATH_ICON = "Interface\\Icons\\INV_Misc_Bone_Skull_01"
+FA.REVENGE_ICON = 132353  -- Ability_Warrior_Revenge
+FA.WIN_SOUND = SOUNDKIT.UI_WORLDQUEST_COMPLETE
+FA.RESPECTS_SOUND = 6675  -- bell toll, tribal
 local frame, parts, pop
 local lastPopup, merged = -math.huge, nil
 local away, awayPending = {}, false
@@ -39,6 +42,7 @@ local function createPopup()
     UI.Fit(parts.title, 1, 0.7)
     parts.iconFrame, parts.icon = UI.FramedIcon(frame, ICON)
     parts.iconFrame:SetPoint("LEFT", 8, 0)
+    parts.win = UI.Win(frame, parts.iconFrame)
     parts.respects = UI.Button(frame, "Pay respects", BUTTON_W, BUTTON_H, function(self)
         local targets, clicking = self.targets or {}, true
         for _, target in ipairs(targets) do
@@ -81,6 +85,7 @@ local function arrange(card, gold, icon)
     parts.iconFrame:SetShown(icon ~= nil)
     parts.icon:SetShown(icon ~= nil)
     if icon then parts.icon:SetTexture(icon) end
+    parts.win.Show(gold == true and icon ~= nil and not card)
     UI.Edge(frame, gold and UI.COLOR.trophy)
     local button = parts.respects:IsShown()
     local left = icon and 8 + ICON + ICON_GAP or PAD
@@ -139,9 +144,21 @@ function FA.Small(line1, line2, targets, gold, icon, quip)
     parts.hasQuip = quip ~= nil and quip ~= ""
     arrange(false, gold, icon)
     pop()
+    if gold and icon then parts.win.Play() end
 end
 
 function FA.ClassName(id) return UI.Colored(F.Name(id), UI.ClassColor(F.Known(id).class) or UI.COLOR.text) end
+
+local function trophyIcon(id) return ns.Trophies.Icon(ns.Trophies.Get(id)) end
+
+local function win(line1, line2, icon)
+    FA.Small(line1, line2, nil, true, icon)
+    FA.Sound(FA.WIN_SOUND)
+end
+
+function FA.YouAvenged(names, line2) win(UI.Muted("You avenged ") .. names, line2, trophyIcon("avenger")) end
+function FA.AvengedYou(name, line2) win(name .. UI.Colored(" avenged you", UI.COLOR.trophy), line2, trophyIcon("avenged")) end
+function FA.Revenge(killer, line2) win(UI.Colored("Revenge on ", UI.COLOR.trophy) .. killer, line2, FA.REVENGE_ICON) end
 
 ---@param number number? which death, as friends were sent it; counted when left out
 function FA.PaidRespects(name, d, number)
@@ -151,6 +168,7 @@ function FA.PaidRespects(name, d, number)
     FA.Small(name .. UI.Muted(" paid respects"),
         UI.Muted(("Your death #%d to "):format(number)) .. UI.KillerName(ns.DeathTitle(d), d.cause)
             .. (rest ~= "" and UI.Muted(", " .. rest) or ""), nil, nil, FA.RESPECTS_ICON)
+    FA.Sound(FA.RESPECTS_SOUND)
 end
 
 ---@param targets table?
@@ -173,9 +191,10 @@ local function deathLine(id, l)
     return ("%s died to %s in %s, death #%d."):format(F.Name(id), l.killer, l.zone or "?", l.number or 0)
 end
 
-function FA.FriendSound()
-    if ns.db.settings.friendSound then PlaySound(FA.SOUND) end
+function FA.Sound(kit)
+    if ns.db.settings.friendSound then PlaySound(kit) end
 end
+function FA.FriendSound() FA.Sound(FA.SOUND) end
 local friendSound = FA.FriendSound
 
 local function cardDetail(l)
@@ -283,8 +302,8 @@ ns.OnEvent("PARTY_KILL", function(attacker, target)
                 F.AddEvent({ kind = "avengedBy", id = id, mob = mob, npc = npc, zone = zone })
                 F.Avenged(id)
                 ns.Trophies.Fact("avenger", { id = id })
-                FA.Small(UI.Muted("You avenged ") .. F.Name(id),
-                    UI.Muted("Killed ") .. UI.MobName(mob or "?") .. UI.Muted((", %s's nemesis, in %s"):format(F.Name(id), zone)), nil, true)
+                FA.YouAvenged(FA.ClassName(id),
+                    UI.Muted("Killed ") .. UI.MobName(mob or "?") .. UI.Muted(", their nemesis"))
             end)
         end
     end
@@ -294,8 +313,7 @@ L.On("G", function(id, p)
     local npc, name = ns.CharacterNemesis()
     if not npc or npc ~= tonumber(p[3]) or ns.InBattle() or F.InGroup(id) then return end
     F.AddEvent({ kind = "avenged", id = id, mob = name, npc = npc, zone = p[4] })
-    FA.Small(F.Name(id) .. " " .. UI.Colored("avenged you", UI.COLOR.trophy),
-        UI.Muted("Killed ") .. UI.MobName(name) .. UI.Muted(", your nemesis. Its bounty is still yours."), nil, true)
+    FA.AvengedYou(FA.ClassName(id), UI.Muted("Killed ") .. UI.MobName(name) .. UI.Muted(", your nemesis. Its bounty is still yours."))
     ns.Trophies.Fact("avenged", { id = id })
 end)
 

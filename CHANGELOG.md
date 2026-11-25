@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.8.0 (2026-11-26)
+
+Revenge on the players who killed you, and on the ones who killed your friends.
+
+### New
+
+- **Revenge:** kill a player who killed you or one of your characters in the last 7 days, and a popup says so.
+- **Avenging:** kill a player who killed a friend in the last 7 days and you avenge them. Your friend gets a popup saying you did.
+
+### Changed
+
+- **Popups:** Revenge and avenging glow and play a sound, and a bell rings when a friend pays respects. Turn the sounds off with **Play sounds with popups**.
+- **Characters:** a deleted character made again with the same name starts from 0. The old one stays under **Deleted characters** with its deaths.
+
+### Fixed
+
+- **History window:** a new character no longer shows under "Other realm".
+
 ## 1.7.1 (2026-11-25)
 
 A fix for friends who show a character twice.

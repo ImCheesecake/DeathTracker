@@ -231,7 +231,7 @@ function R.Slides(key)
     local out = {}
     if m.deaths == 0 then
         local n = 0
-        for _ in pairs(ns.db.characters) do n = n + 1 end
+        for _, c in pairs(ns.db.characters) do if not c.deleted then n = n + 1 end end
         local any = n > 1 and (", on any of your %d characters"):format(n) or ""
         out[1] = { label = "THE COUNT", title = "Not once.", titleSize = 50, lines = { { text = ("No deaths in %s%s."):format(m.name, any) } },
             roast = R.Roast("none", {}) }

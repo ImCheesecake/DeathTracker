@@ -53,6 +53,7 @@ UI.COLOR = {
     trophy = rgb("e8c766"),
     hover = rgb("24262b"),
     selected = rgb("2c2820"),
+    gone = rgb("1d1e22"),
     fresh = rgb("2c2820", 0.5),
     white = rgb("ffffff"),
     shaman = rgb("3a96f0"),
@@ -1279,13 +1280,14 @@ function UI.TextButton(parent, text, onClick, title, tip)
     return b
 end
 
-function UI.Glow(frame)
+---@param around table? the region to glow around; the frame itself when left out
+function UI.Glow(frame, around)
     local glow = frame:CreateTexture(nil, "OVERLAY")
     glow:SetAtlas("bags-glow-white")
     glow:SetBlendMode("ADD")
     glow:SetVertexColor(unpack(UI.COLOR.trophy))
-    glow:SetPoint("TOPLEFT", -4, 4)
-    glow:SetPoint("BOTTOMRIGHT", 4, -4)
+    glow:SetPoint("TOPLEFT", around or frame, "TOPLEFT", -4, 4)
+    glow:SetPoint("BOTTOMRIGHT", around or frame, "BOTTOMRIGHT", 4, -4)
     local pulse = glow:CreateAnimationGroup()
     pulse:SetLooping("BOUNCE")
     local fade = pulse:CreateAnimation("Alpha")
@@ -1473,7 +1475,7 @@ function UI.CharName(name)
     return UI.FactionMarkup(ns.CharFaction and ns.CharFaction(name)) .. name
 end
 
-function UI.FillPaneRow(row, name, color, level, count, selected, indent, faction)
+function UI.FillPaneRow(row, name, color, level, count, selected, indent, faction, gone)
     local atlas = faction and UI.FACTION_ATLAS[faction]
     local left, width = (indent and not atlas) and 20 or 8, row:GetWidth() > 0 and row:GetWidth() or row.width
     row.faction:SetShown(atlas ~= nil)
@@ -1491,7 +1493,7 @@ function UI.FillPaneRow(row, name, color, level, count, selected, indent, factio
     local room = width - left - 8 - row.count:GetUnboundedStringWidth() - 10
         - ((level or "") ~= "" and row.level:GetUnboundedStringWidth() + 5 or 0)
     row.name:SetWidth(math.max(0, math.min(math.ceil(row.name:GetUnboundedStringWidth()) + 1, math.floor(room))))
-    row.tint = selected and UI.COLOR.selected or nil
+    row.tint = selected and UI.COLOR.selected or gone and UI.COLOR.gone or nil
 end
 
 function UI.FriendName(tag, char)
@@ -2033,6 +2035,46 @@ function UI.FramedIcon(parent, size)
     icon:SetSize(inner, inner)
     icon:SetPoint("CENTER", frame)
     return frame, icon
+end
+
+local WIN = { shineW = 92, delay = 0.3, sweep = 0.9, fade = 0.3, shine = 0.9 }
+
+-- A win on a popup: its framed icon glowing, one shine across.
+function UI.Win(frame, icon)
+    local glow = UI.Glow(frame, icon)
+    local shine = atlas(frame, "Evergreen-toast-celebration-Shine", "OVERLAY")
+    shine:SetBlendMode("ADD")
+    shine:SetWidth(WIN.shineW)
+    shine:SetPoint("TOPRIGHT", frame, "TOPLEFT")
+    shine:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT")
+    shine:SetAlpha(0)
+    local sweep = shine:CreateAnimationGroup()
+    local move = sweep:CreateAnimation("Translation")
+    move:SetStartDelay(WIN.delay)
+    move:SetDuration(WIN.sweep)
+    move:SetSmoothing("IN_OUT")
+    local show = sweep:CreateAnimation("Alpha")
+    show:SetStartDelay(WIN.delay)
+    show:SetDuration(WIN.fade)
+    show:SetFromAlpha(0)
+    show:SetToAlpha(WIN.shine)
+    local hide = sweep:CreateAnimation("Alpha")
+    hide:SetStartDelay(WIN.delay + WIN.sweep - WIN.fade)
+    hide:SetDuration(WIN.fade)
+    hide:SetFromAlpha(WIN.shine)
+    hide:SetToAlpha(0)
+    local win = {}
+    function win.Show(on)
+        glow:SetShown(on)
+        shine:SetShown(on)
+    end
+    function win.Play()
+        sweep:Stop()
+        move:SetOffset(frame:GetWidth() + WIN.shineW, 0)
+        sweep:Play()
+    end
+    win.Show(false)
+    return win
 end
 
 function UI.TrophyCard(row)

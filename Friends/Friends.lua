@@ -90,7 +90,7 @@ function F.Cause(l) return l.cause or (l.npc and "mob") or (l.spell and "player"
 local function gather()
     local chars, killers, killerNames, levels = {}, {}, {}, 0
     for key, c in pairs(ns.db.characters) do
-        chars[key] = { name = c.name, class = c.class, faction = c.faction, level = c.level or 1, deaths = 0, longest = 0, pDeaths = {}, pLongest = {},
+        chars[key] = { name = c.name, deleted = c.deleted, class = c.class, faction = c.faction, level = c.level or 1, deaths = 0, longest = 0, pDeaths = {}, pLongest = {},
             repair = 0, ran = 0, ghost = 0, hit = 0, bg = 0, dungeon = 0, pBg = {}, pDungeon = {} }
     end
     local starts = {}
@@ -257,7 +257,7 @@ local function body(rec)
             c.hitTime or "", clean(c.ranZone), c.ranTime or "", c.dungeon or 0, table.concat(periods(c.pDungeon or {}), "/"),
             table.concat(periods(c.pBg or {}), "/"), c.runSecs or "", clean(c.longestWhat), clean(c.longestZone),
             c.longestTime or "", c.costly or 0, clean(c.costlyWhat), c.costlyTime or "", c.ghostMost or 0, clean(c.ghostZone),
-            c.ghostTime or "", clean(c.hitZone), clean(c.faction) }, ",")
+            c.ghostTime or "", clean(c.hitZone), clean(c.faction), c.deleted or "" }, ",")
     end
     for _, k in ipairs(rec.killers) do killers[#killers + 1] = table.concat({ k.npc, k.kills, clean(k.name) }, ",") end
     local all = {}
@@ -357,17 +357,18 @@ local function sameChar(a, b)
     return c
 end
 
--- A full name is one character on Forever, so two entries with one name are the same character: a friend
--- whose saved data was reset (a new id) or saved under a realmless key.
+-- A full name is one living character on Forever, so two entries with one name are the same character: a
+-- friend whose saved data was reset (a new id) or saved under a realmless key. A deleted one stays apart.
 local function byName(chars)
     local out, at = {}, {}
     for _, c in ipairs(chars) do
-        local i = at[c.name]
+        local key = c.name .. "#" .. (c.deleted or "")
+        local i = at[key]
         if i then
             out[i] = sameChar(out[i], c)
         else
             out[#out + 1] = c
-            at[c.name] = #out
+            at[key] = #out
         end
     end
     return out
@@ -423,7 +424,7 @@ function F.Parse(text)
             ranTime = tonumber(f[24]), dungeon = num(f[25]), pDungeon = {}, pBg = {}, runSecs = tonumber(f[28]),
             longestWhat = opt(f[29]), longestZone = opt(f[30]), longestTime = tonumber(f[31]), costly = num(f[32]),
             costlyWhat = opt(f[33]), costlyTime = tonumber(f[34]), ghostMost = num(f[35]), ghostZone = opt(f[36]),
-            ghostTime = tonumber(f[37]), hitZone = opt(f[38]), faction = opt(f[39]) }
+            ghostTime = tonumber(f[37]), hitZone = opt(f[38]), faction = opt(f[39]), deleted = tonumber(f[40]) }
         local cdg, cbg = split(f[26] or "", "/"), split(f[27] or "", "/")
         for i, period in ipairs(F.PERIODS) do ch.pDungeon[period], ch.pBg[period] = num(cdg[i]), num(cbg[i]) end
         if tonumber(f[19]) then ch.last = { killer = f[17], zone = opt(f[18]), time = tonumber(f[19]) } end
@@ -591,8 +592,13 @@ function F.Value(r, kind, period, char)
     return t and t[period] or 0
 end
 
-function F.Char(rec, name)
-    for _, c in ipairs(rec and rec.chars or {}) do if c.name == name then return c end end
+function F.Char(rec, name, deleted)
+    local found
+    for _, c in ipairs(rec and rec.chars or {}) do
+        if c.name == name and c.deleted == deleted then return c end
+        found = found or c.name == name and c or nil
+    end
+    return found
 end
 
 local sourceLog

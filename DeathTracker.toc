@@ -2,7 +2,7 @@
 ## Title: Death Tracker
 ## Notes: Counts your deaths and shows what killed you.
 ## Author: ImCheesecak3
-## Version: 1.7.1
+## Version: 1.8.0
 ## IconTexture: Interface\AddOns\DeathTracker\Media\Icon
 ## SavedVariables: DeathTrackerDB
 ## AddonCompartmentFunc: DeathTracker_OnAddonCompartmentClick
@@ -47,3 +47,4 @@ History\HistoryFriends.lua
 Counter\MinimapButton.lua
 Counter\Tooltip.lua
 Counter\Grudge.lua
+Counter\Revenge.lua

@@ -88,6 +88,7 @@ end
 function Shell.Filter()
     local f = menuFilter()
     f.char, f.of, f.name = state.char, state.friend, state.friendChar
+    if state.friendChar then f.gone = state.friendGone ~= nil end
     return f
 end
 
@@ -121,7 +122,7 @@ end
 Shell.NoFilter = shellDefault
 
 function Shell.YourKey(name)
-    for key, c in pairs(ns.db.characters) do if c.name == name then return key end end
+    for key, c in pairs(ns.db.characters) do if c.name == name and not c.deleted then return key end end
 end
 
 function Shell.Friend() return state.friend, state.friendChar end
@@ -137,6 +138,7 @@ local refresh, showDetails
 
 function Shell.Pick(pick, page)
     state.friend, state.friendChar, state.char, state.ruleset = pick.friend and ns.Friends.Primary(pick.friend), pick.friendChar, pick.char, nil
+    state.friendGone = pick.friendGone
     if not pick.friend then state.compare = nil end
     if page then return Shell.Show(page) end
     refresh()
@@ -171,7 +173,7 @@ local function showing()
     if state.friend then
         local who = Shell.ColoredName(state.friend)
         if state.friendChar then
-            local c = ns.Friends.Char(ns.Friends.Record(state.friend), state.friendChar)
+            local c = ns.Friends.Char(ns.Friends.Record(state.friend), state.friendChar, state.friendGone)
             who = who .. "'s " .. UI.Colored(UI.CharName(state.friendChar), UI.ClassColor(c and c.class) or UI.COLOR.text)
         end
         local own = current.FriendShowing and current.FriendShowing(who)
@@ -254,6 +256,7 @@ local function buildCharacter(row)
         if button == "RightButton" then return end
         local item = self.item
         state.friend, state.friendChar, state.char, state.ruleset = item.friend, item.friendChar, item.key, nil
+        state.friendGone = item.gone
         if not item.friend then state.compare = nil end
         if current.key == "friends" then return Shell.Show(item.friend and "records" or "deaths") end
         refresh()
@@ -294,7 +297,7 @@ local function realmTip(row, item)
 end
 
 local function fillCharacter(row, item)
-    UI.FillPaneRow(row, item.name, item.color, item.level, item.deaths, item.selected, item.indent, item.faction)
+    UI.FillPaneRow(row, item.name, item.color, item.level, item.deaths, item.selected, item.indent, item.faction, item.gone)
 end
 
 local function bothFactions(chars)
@@ -305,6 +308,12 @@ end
 
 local function characterTip(row, item)
     local onFriends = current.key == "friends"
+    if item.gone then
+        local day = UI.Date(item.gone)
+        local when = (day == "today" or day == "yesterday") and day or "on " .. day
+        return UI.Tooltip(row, item.name, item.color, { ("Deleted. A new character took its name %s."):format(when) },
+            onFriends and item.friend and "Show this character's records." or "Show only this character's deaths.")
+    end
     if item.friendChar then
         return UI.HelpTip(row, item.name, (onFriends and "Show %s's records." or "Show only %s's deaths."):format(item.name))
     end
@@ -328,12 +337,14 @@ local function characterItems()
     local f = menuFilter()
     f.ruleset = nil
     local byRuleset, total, mixed = {}, 0, bothFactions(ns.db.characters)
+    local gone = {}
     for key, c in pairs(ns.db.characters) do
         local r = ns.Ruleset(key) or "Other"
         f.char = key
-        byRuleset[r] = byRuleset[r] or {}
-        table.insert(byRuleset[r], { kind = "character", key = key, name = c.name, level = c.level, faction = mixed and c.faction or nil,
-            color = UI.ClassColor(c.class), deaths = #ns.Deaths(f), selected = not state.friend and state.char == key })
+        local list = c.deleted and gone or byRuleset[r] or {}
+        if not c.deleted then byRuleset[r] = list end
+        table.insert(list, { kind = "character", key = key, name = c.name, level = c.level, faction = mixed and c.faction or nil,
+            color = UI.ClassColor(c.class), deaths = #ns.Deaths(f), selected = not state.friend and state.char == key, gone = c.deleted })
         total = total + 1
     end
     f.char = nil
@@ -357,6 +368,11 @@ local function characterItems()
         items[#items + 1] = { kind = #order > 1 and "realm" or "heading", text = heading, ruleset = r, count = #chars,
             selected = not state.friend and state.ruleset == r and not state.char }
         for _, c in ipairs(chars) do items[#items + 1] = c end
+    end
+    if #gone > 0 then
+        table.sort(gone, function(a, b) return a.gone > b.gone end)
+        items[#items + 1] = { kind = "heading", text = "Deleted characters" }
+        for _, c in ipairs(gone) do items[#items + 1] = c end
     end
     return items
 end
@@ -384,12 +400,17 @@ local function friendItems(items)
                     level = F.IsGuildOnly(id) and rec.chars[1] and rec.chars[1].level or nil, deaths = F.Value(rec, "deaths", period),
                     selected = state.friend == id and not (several and state.friendChar) }
                 if several and state.friend == id then
-                    local mixed = bothFactions(rec.chars)
-                    for _, c in ipairs(rec.chars) do
+                    local mixed, chars = bothFactions(rec.chars), {}
+                    for _, c in ipairs(rec.chars) do chars[#chars + 1] = c end
+                    table.sort(chars, function(a, b)
+                        if (a.deleted ~= nil) ~= (b.deleted ~= nil) then return b.deleted ~= nil end
+                        return a.name < b.name
+                    end)
+                    for _, c in ipairs(chars) do
                         items[#items + 1] = { kind = "character", friend = id, friendChar = c.name, name = c.name, indent = true,
                             faction = mixed and c.faction or nil,
                             color = UI.ClassColor(c.class), level = c.level, deaths = F.Value(rec, "deaths", period, c),
-                            selected = state.friendChar == c.name }
+                            gone = c.deleted, selected = state.friendChar == c.name and state.friendGone == c.deleted }
                     end
                 end
             end
@@ -425,7 +446,7 @@ local function friendNemesis()
     local rec = ns.Friends.Record(state.friend)
     local name, kills
     if state.friendChar then
-        local c = ns.Friends.Char(rec, state.friendChar)
+        local c = ns.Friends.Char(rec, state.friendChar, state.friendGone)
         name, kills = c.nemName, c.nemKills
     elseif rec.nem then
         name, kills = rec.nem.name, rec.nem.kills
@@ -568,7 +589,7 @@ function refresh()
     end
     local friendRec = state.friend and ns.Friends.Shares(state.friend) and ns.Friends.Record(state.friend)
     if not friendRec then state.friend, state.friendChar, state.compare = nil, nil, nil end
-    if state.friendChar and not ns.Friends.Char(friendRec, state.friendChar) then state.friendChar = nil end
+    if state.friendChar and not ns.Friends.Char(friendRec, state.friendChar, state.friendGone) then state.friendChar = nil end
     if state.friend then ns.FriendsLink.WantDeaths(state.friend) end
     page.time:GenerateMenu()
     page.time:SetShown(not current.noTime)
@@ -736,5 +757,7 @@ SlashCmdList.DEATHTRACKER = function(msg)
     if command == "recap" and ns.RecapDemo then return ns.RecapDemo(rest) end
     if command == "road" and ns.RoadDemo then return ns.RoadDemo() end
     if command == "grudge" and ns.GrudgeDemo then return ns.GrudgeDemo() end
+    if command == "deleted" and ns.DeletedDemo then return ns.DeletedDemo() end
+    if command == "revenge" and ns.RevengeDemo then return ns.RevengeDemo() end
     ns.ToggleHistory()
 end

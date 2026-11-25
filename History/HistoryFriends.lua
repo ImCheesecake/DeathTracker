@@ -78,7 +78,8 @@ local function target(e)
     elseif e.kind == "nemesis" then
         sel = { kind = "killer", npc = e.nem.npc, name = e.nem.name, of = e.id }
     elseif e.kind == "avenged" or e.kind == "avengedBy" then
-        sel = { kind = "killer", npc = e.npc, name = e.mob, of = e.kind == "avengedBy" and e.id or nil, mine = e.kind == "avenged" }
+        sel = { kind = "killer", player = e.player ~= nil, npc = not e.player and e.npc or nil, name = e.player or e.mob,
+            of = e.kind == "avengedBy" and e.id or nil, mine = e.kind == "avenged" }
     end
     if sel and sel.kind == "killer" and not Shell.FindKiller(sel) then return nil end
     if sel then sel.event = e end
@@ -239,11 +240,17 @@ local function eventLines(e)
         return who .. UI.Muted(" passed ") .. whom, UI.Muted(("Most deaths, now %d"):format(e.deaths)), name .. " passed " .. other
     elseif e.kind == "respects" then
         return who .. UI.Muted(" paid respects"), UI.Muted("For your death to ") .. UI.KillerName(e.killer or "?", e.cause), name .. " paid respects"
+    elseif e.kind == "avenged" and e.player then
+        return who .. UI.Muted(" avenged you"), UI.Muted("Killed ") .. ns.Grudge.Painted(e.player, e.class)
+            .. UI.Muted((", who killed you %s, in %s"):format(UI.Times(e.n or 1), e.zone or "?")), name .. " avenged you"
     elseif e.kind == "avenged" then
         return who .. UI.Muted(" avenged you"), UI.Muted(("Killed %s, your nemesis, in %s"):format(e.mob or "?", e.zone or "?")),
             name .. " avenged you"
+    elseif e.kind == "avengedBy" and e.player then
+        return UI.Muted("You avenged ") .. who, UI.Muted("Killed ") .. ns.Grudge.Painted(e.player, e.class)
+            .. UI.Muted((", who killed them %s, in %s"):format(UI.Times(e.n or 1), e.zone or "?")), "You avenged " .. name
     elseif e.kind == "avengedBy" then
-        return UI.Muted("You avenged ") .. who, UI.Muted(("Killed %s, %s's nemesis, in %s"):format(e.mob or "?", name, e.zone or "?")),
+        return UI.Muted("You avenged ") .. who, UI.Muted(("Killed %s, their nemesis, in %s"):format(e.mob or "?", e.zone or "?")),
             "You avenged " .. name
     elseif e.kind == "shared" then
         return who .. UI.Muted(" shares death counts with you now"), UI.Muted(e.how or ""), name .. " shares death counts with you now"

@@ -13,7 +13,7 @@ G.POP = 40
 G.HORN = { Horde = 8212, Alliance = 8174 }
 G.LOOK_AGAIN = 60    -- seconds before a player who killed no one is looked up again
 
-local warned, looked = {}, {}
+local warned, looked, names = {}, {}, {}
 local frame
 
 -- Whom a player killed in the last G.DAYS days: you (this character), your other characters and friends
@@ -48,13 +48,22 @@ local function ownClass(d) return (ns.db.characters[d.char] or {}).class end
 G.Painted = painted
 
 local function friendWord(f) return "your friend " .. friendName(f) end
+G.FriendName = friendName
+
+-- One other character, by name; deaths of several: nil.
+local function oneAlt(alts)
+    for _, d in ipairs(alts) do if d.name ~= alts[1].name then return nil end end
+    return painted(alts[1].name, ownClass(alts[1]))
+end
 
 -- The rows under "<name> is near.": "They killed you 2 times" / "and your friend Grimtusk once"; several
--- friends: "and 3 of your friends".
-function G.Rows(v)
+-- friends: "and 3 of your friends". named: one other character by its name.
+function G.Rows(v, named)
     local parts = {}
     if #v.you > 0 then parts[#parts + 1] = "you " .. UI.Times(#v.you) end
-    if #v.alts > 0 then parts[#parts + 1] = "your other characters " .. UI.Times(#v.alts) end
+    if #v.alts > 0 then
+        parts[#parts + 1] = (named and oneAlt(v.alts) or "your other characters") .. " " .. UI.Times(#v.alts)
+    end
     if #v.friends == 1 then
         parts[#parts + 1] = friendWord(v.friends[1]) .. " " .. UI.Times(#v.friends[1].deaths)
     elseif #v.friends > 1 then
@@ -146,14 +155,20 @@ function G.Check(name, classFile)
     tellFriends(name, v, classFile)
 end
 
+-- Revenge reads the name here: PARTY_KILL gives only the GUID.
+function G.Known(guid) return names[guid] end
+
 local function seen(unit)
-    if not ns.db.settings.grudge or ns.InBattle() then return end
+    if ns.InBattle() then return end
     local player, enemy = UnitIsPlayer(unit), UnitCanAttack("player", unit)
     if issecretvalue(player) or issecretvalue(enemy) or not player or not enemy then return end
     local first, surname = UnitName(unit)
     if not first or issecretvalue(first) or issecretvalue(surname) then return end
     local _, classFile = UnitClass(unit)
-    G.Check(NameUtil.GetFullNameWithoutRealm(first, surname), not issecretvalue(classFile) and classFile or nil)
+    local name, guid = NameUtil.GetFullNameWithoutRealm(first, surname), UnitGUID(unit)
+    classFile = not issecretvalue(classFile) and classFile or nil
+    if guid and not issecretvalue(guid) then names[guid] = { name = name, class = classFile } end
+    if ns.db.settings.grudge then G.Check(name, classFile) end
 end
 
 ns.OnEvent("PLAYER_TARGET_CHANGED", function() seen("target") end)

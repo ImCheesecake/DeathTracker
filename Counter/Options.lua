@@ -53,9 +53,8 @@ ns.OnEvent("PLAYER_LOGIN", function()
     function importCode.note() return importCode.isNew() and "This update changed the code. Import it again." or nil end
     local allTime = check("counterAllTime", "Show all-time deaths", "Your deaths of all time, beside this stream's count.",
         streamer, ns.Changed)
-    local friendSound = check("friendSound", "Play a sound when a friend dies",
-        "A short sound with the popup, so you notice it while you play.")
-    function friendSound.isOn() return ns.db.settings.friendDeath ~= "off" end
+    local friendSound = check("friendSound", "Play sounds with popups",
+        "A short sound when a friend dies, a bell when a friend pays respects, and a fanfare for revenge and avenging.")
     local defs = {
         header("On screen"),
         counter,
