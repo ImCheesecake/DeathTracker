@@ -1,5 +1,3 @@
--- The corner counter: deaths and by cause, the last two deaths, time played this life and the
--- nemesis, all on this character (with Streamer.bot on: all since the stream started).
 local _, ns = ...
 local UI = ns.UI
 
@@ -9,7 +7,7 @@ local SIZE, SMALL, NUMBER_SIZE = 14, 12, 48
 local LINE, LINE_GAP = UI.LineHeight(SIZE), 4
 local NAME_GAP = 3
 local SPLIT_GAP = 14
-local BARE_GAP = 4             -- where the line under the causes was, without a panel
+local BARE_GAP = 4
 local HALF = (INNER - 2 * SPLIT_GAP - 1) / 2
 
 local CAUSES = ns.CAUSES
@@ -20,7 +18,6 @@ function ns.CountLabel(n, counting)
     return UI.Plural(n, "death", "deaths") .. (counting.stream and " this stream" or "")
 end
 
--- layout is "box" or "bar": the one the player picked shows.
 function ns.CounterShows(layout)
     local s = ns.db.settings
     return s.counter and s.counterLayout == layout
@@ -45,7 +42,6 @@ end
 
 local function isLayout(layout) return ns.db.settings.counterLayout == layout end
 
--- Right-click either layout: pick the other, or open the settings.
 function ns.LayoutMenu(f)
     UI.RightClickMenu(f, function(root)
         root:CreateTitle("Layout")
@@ -64,7 +60,6 @@ function ns.LayoutMenu(f)
     end)
 end
 
--- Whether that layout's frame needs a full redraw: it should show or hide, or the background changed.
 function ns.CounterStale(frame, layout)
     local on = ns.CounterShows(layout)
     return frame:IsShown() ~= on or (on and frame.bare == ns.db.settings.counterPanel), on
@@ -96,7 +91,7 @@ local function create()
     ns.LayoutMenu(frame)
     parts = { number = UI.Text(frame, "number", NUMBER_SIZE, "text"), label = UI.Text(frame, "body", 15, "muted"),
         causes = {}, divider = UI.Divider(frame), line = UI.Divider(frame, true) }
-    -- The game sets Cinzel higher in its line than other text, hence the offsets.
+    -- The game sets Cinzel higher in its line than other text.
     parts.number:SetPoint("TOPLEFT", PAD_X, -PAD_Y - 5)
     parts.label:SetPoint("BOTTOMLEFT", parts.number, "BOTTOMRIGHT", 10, 11)
     for i = 1, #CAUSES do parts.causes[i] = UI.Pair(frame, SIZE, (INNER - GAP) / 2) end
@@ -196,7 +191,6 @@ function refresh()
     frame:SetHeight(y + PAD_Y)
 end
 
--- Each second only the times change.
 function tick()
     local stale, on = ns.CounterStale(frame, "box")
     if stale then return refresh() end

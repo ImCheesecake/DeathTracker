@@ -1,5 +1,3 @@
--- Once a month ends or a character reaches 60: Blizzard's New Recipe Learned! toast with our words
--- and its own sound; a click plays the recap, a right-click closes it.
 local _, ns = ...
 local UI, R = ns.UI, ns.Recap
 

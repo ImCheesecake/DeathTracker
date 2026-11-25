@@ -1,8 +1,6 @@
--- A line under the game's tooltip on a mob or a player that has killed you: how often, and when last.
 local _, ns = ...
 local UI = ns.UI
 
--- Mobs by NPC ID, players by full name, as the history counts them.
 local function hovered(tooltip, guid)
     local kind, npc = ns.ParseGUID(guid)
     if (kind == "Creature" or kind == "Vehicle") and npc then return { npc = npc } end

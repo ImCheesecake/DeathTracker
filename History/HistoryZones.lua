@@ -1,4 +1,3 @@
--- The history window's Zones page: where you die most, by zone and by spot (a subzone).
 local _, ns = ...
 local UI = ns.UI
 local Shell = ns.HistoryShell
@@ -59,7 +58,6 @@ end
 
 local LAST_SHOWN = 3
 
--- A zone or spot: who died there, what killed you most, its deadliest spots, its latest deaths.
 local function placeDetails(panel, sel)
     if sel.kind ~= "place" then return false end
     local f = Shell.Filter()
@@ -72,7 +70,7 @@ local function placeDetails(panel, sel)
     end
     panel:Title(sel.spot or sel.zone, UI.COLOR.white)
     local names = {}
-    for _, c in ipairs(H.KillsOn(deaths)) do names[#names + 1] = c.name end
+    for _, c in ipairs(H.KillsOn(deaths)) do names[#names + 1] = UI.CharName(c.name) end
     local who = #names > 2 and ("%s and %d others died here"):format(names[1], #names - 1)
         or (table.concat(names, " and ") .. " died here")
     panel:Line(sel.spot and sel.zone .. ". " .. who or who)

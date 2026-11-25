@@ -1,5 +1,3 @@
--- The shared look: colors, fonts and the builders every page uses. Pages never make frames,
--- textures or colors of their own.
 local addonName, ns = ...
 local UI = {}
 ns.UI = UI
@@ -15,8 +13,7 @@ UI.FONT = {
     italic = MEDIA .. "Fonts\\Inter-Italic.ttf",
 }
 
--- Our fonts are Latin only (Inter also has Cyrillic), so names in other alphabets, a Russian
--- killer's or a Korean zone's, come from the game's own fonts, as Blizzard's font families do.
+-- Our fonts are Latin only (Inter also has Cyrillic), so other alphabets come from the game's own fonts.
 local OTHER_ALPHABETS = {
     russian = "Fonts\\FRIZQT___CYR.TTF",
     korean = "Fonts\\2002.TTF",
@@ -60,14 +57,12 @@ UI.COLOR = {
     white = rgb("ffffff"),
     shaman = rgb("3a96f0"),
     wash = rgb("000000", 0.45),
-    -- A progress bar's dark track, its muted green, its faint brown edge and the black line outside it.
     barTrack = rgb("000000", 0.55),
     barFill = rgb("1e631e"),
     barEdge = rgb("4a3f29"),
     barOutline = rgb("000000"),
     parchmentLine = rgb("8a6a3c"),
     slideBar = rgb("4a4436"),
-    -- Blizzard's blue for a link in chat.
     link = rgb("71d5ff"),
     shadow = rgb("000000", 0.8),
     stamp = rgb("6e0e0e"),
@@ -79,7 +74,6 @@ UI.COLOR = {
     },
 }
 
--- A 9-sliced rounded texture: the 8-pixel corners keep their shape at any size.
 local function rounded(frame, file, color, layer)
     local t = frame:CreateTexture(nil, layer)
     t:SetTexture(MEDIA .. file)
@@ -90,7 +84,6 @@ local function rounded(frame, file, color, layer)
     return t
 end
 
--- A panel's edge in another color (a rare card's gold), or back to its own with nil.
 function UI.Edge(panel, color) panel.border:SetVertexColor(unpack(color or UI.COLOR.cardBorder)) end
 
 function UI.Panel(width, look)
@@ -102,7 +95,6 @@ function UI.Panel(width, look)
     return f
 end
 
--- A 1-pixel line in a color; anchor it on the edge it belongs to.
 local function line(frame, color)
     local t = frame:CreateTexture(nil, "BORDER")
     t:SetColorTexture(unpack(color))
@@ -112,7 +104,6 @@ end
 
 local function edge(frame) return line(frame, UI.COLOR.border) end
 
--- A join's texture is 16 square with its curve in the top corner; the right one is the left mirrored.
 UI.JOIN = 10
 local function curve(tab, file, color, layer, side)
     local t = tab:CreateTexture(nil, layer)
@@ -128,9 +119,6 @@ local function curve(tab, file, color, layer, side)
     return t
 end
 
--- A panel with a tab hanging under its middle, joined by inward curves: the panel's bottom edge
--- opens there, and the tab's border starts where the curves end. Without a panel only the fills
--- go. The tab drags and right-clicks as the panel.
 function UI.Notch(tabHeight)
     local f = CreateFrame("Frame", nil, UIParent)
     f.fill = rounded(f, "PanelFill", UI.COLOR.panel, "BACKGROUND")
@@ -164,7 +152,6 @@ function UI.Notch(tabHeight)
     return f
 end
 
--- Once the panel has its width; no tabWidth hides the tab. The tab needs JOIN + 8 free on each side.
 function UI.ShapeNotch(f, tabWidth)
     local width = f:GetWidth()
     f.tab:SetShown(tabWidth ~= nil)
@@ -179,7 +166,6 @@ function UI.ShapeNotch(f, tabWidth)
     f.bottom[2]:SetWidth(side)
 end
 
--- Blizzard's own window text (its font objects: Friz Quadrata, with a shadow), in one of our colors.
 local GAME_FONT = { small = "GameFontHighlightSmall", normal = "GameFontHighlight", large = "GameFontHighlightLarge" }
 function UI.GameText(parent, size, color)
     local t = parent:CreateFontString(nil, "OVERLAY", GAME_FONT[size])
@@ -197,7 +183,6 @@ function UI.Text(parent, font, size, color)
     return t
 end
 
--- A color set afterwards (a cause's) stays.
 function UI.Bare(panel, texts, on)
     for _, t in ipairs(panel.backdrop) do t:SetShown(not on) end
     for _, t in ipairs(texts) do
@@ -209,13 +194,10 @@ function UI.Bare(panel, texts, on)
     end
 end
 
--- After its width changes, call text:ScaleTextToFit().
--- A text too long for its lines shrinks to smallest; still too long, it gets up to most lines.
 function UI.Fit(text, lines, smallest, most)
     Mixin(text, AutoScalingFontStringMixin)
     text:SetMaxLines(lines)
-    -- The mixin takes the full size from GetLineHeight(), which is 0 in game while the text is
-    -- empty (and it would divide by it); the font's size is set from the start.
+    -- The mixin reads its full size from GetLineHeight(), which is 0 in game while the text is empty.
     local _, size = text:GetFont()
     text.baseLineHeight = Round(size)
     text:SetMinLineHeight(Round(size * smallest))
@@ -231,7 +213,7 @@ function UI.Fit(text, lines, smallest, most)
     end
 end
 
--- A line's height for a text size: 1.21 times it, as the fonts set it; a title's is 1.1.
+-- The fonts' own line height: 1.21 times the size, a title's 1.1.
 function UI.LineHeight(size, factor) return math.floor(size * (factor or 1.21) + 0.5) end
 
 function UI.Plural(n, one, many) return n == 1 and one or many end
@@ -242,11 +224,10 @@ function UI.Count(n, one, many) return ("%d %s"):format(n, UI.Plural(n, one, man
 
 function UI.CauseColor(cause) return UI.COLOR.cause[cause] or UI.COLOR.cause.unknown end
 
--- Blizzard's own: the two biggest units, one letter each ("45s", "1h 14m", "1d 2h").
 local durations = CreateFromMixins(SecondsFormatterMixin)
 durations:Init(0, SecondsFormatter.Abbreviation.OneLetter)
 durations:SetStripIntervalWhitespace(true)
--- Blizzard's own hook: without it a zero unit is skipped and 8 h 0 min 37 s reads "8h 37s".
+-- Without this hook Blizzard's formatter skips a zero unit: 8 h 0 min 37 s reads "8h 37s".
 function durations:GetMinInterval(seconds)
     local unit = SecondsFormatter.Interval
     if seconds >= 86400 then return unit.Hours end
@@ -255,15 +236,13 @@ function durations:GetMinInterval(seconds)
 end
 function UI.Duration(seconds) return durations:Format(seconds) end
 
--- A run back as the time spent running. Runs saved before the addon timed them read as an estimate
--- at a ghost's own speed: 7 yards a second plus the Ghost aura's 25% (docs/research, ghost run speed).
+-- A ghost runs 7 yards a second plus the Ghost aura's 25%.
 UI.GHOST_SPEED = 8.75
 function UI.RunText(yards, seconds)
     if seconds and seconds > 0 then return UI.Duration(seconds) end
     return "about " .. UI.Duration(math.max(1, math.floor((yards or 0) / UI.GHOST_SPEED + 0.5)))
 end
 
--- "mobs, falls and lava".
 function UI.AndList(words)
     if #words == 1 then return words[1] end
     return table.concat(words, ", ", 1, #words - 1) .. " and " .. words[#words]
@@ -289,8 +268,6 @@ function UI.Ago(when)
     return "on " .. (date("%d %b", when):gsub("^0", ""))
 end
 
--- "today", "yesterday" or "3 Mar"; weekday ("%a" or "%A") always gives the date: "Sat 12 Jan".
--- Another year's date carries the year. Today and yesterday are days as ns.Day counts them.
 function UI.Date(when, weekday)
     if not weekday then
         local day = ns.Day(when)
@@ -302,17 +279,14 @@ function UI.Date(when, weekday)
     return text
 end
 
--- bare: "5 Nov 23:24" for a column, instead of "on 5 Nov at 23:24".
 function UI.At(when, bare)
     local day = UI.Date(when)
     local on = (bare or day == "today" or day == "yesterday") and "" or "on "
     return on .. day .. (bare and " " or " at ") .. date("%H:%M", when)
 end
 
--- After a label in a tooltip ("Since", "Paid"): "today at 20:58", "14 Nov at 20:12".
 function UI.AtTime(when) return UI.Date(when) .. " at " .. date("%H:%M", when) end
 
--- A moment in a list, as the Base page writes it: "Today, 22:45", "19 Oct, 21:48".
 function UI.Moment(when) return UI.Capital(UI.Date(when)) .. ", " .. date("%H:%M", when) end
 
 function UI.Named(name, ...)
@@ -330,16 +304,12 @@ function UI.ClassColor(classFile)
     return c and { c.r, c.g, c.b, 1 }
 end
 
--- Text in a color, for game text that can't be tinted as a whole (a popup's second line).
 function UI.Colored(text, color) return CreateColor(unpack(color)):WrapTextInColorCode(text) end
 
--- Words in a line of mixed colors: the quiet ones, and a killer's name in its cause's color.
 function UI.Muted(text) return UI.Colored(text, UI.COLOR.muted) end
 function UI.KillerName(text, cause) return UI.Colored(text, UI.CauseColor(cause)) end
 function UI.MobName(text) return UI.KillerName(text, "mob") end
 
--- Blizzard's friends list colors (FriendsFrame): an account's name, a character's name, offline.
--- Offline is a shade lighter than Blizzard's 808080, which is 3.7:1 on a picked pane row.
 local FRIENDS = { bnet = { "FRIENDS_BNET_NAME_COLOR", "82c5ff" }, character = { "FRIENDS_WOW_NAME_COLOR", "fde05c" },
     offline = { false, "8f8f8f" } }
 function UI.FriendColor(kind)
@@ -348,7 +318,6 @@ function UI.FriendColor(kind)
     return rgb(FRIENDS[kind][2])
 end
 
--- Blizzard's gold for a label beside a value (GameFontNormal, as the character sheet's stat names).
 function UI.LabelColor()
     local c = NORMAL_FONT_COLOR
     return { c.r, c.g, c.b, 1 }
@@ -366,11 +335,9 @@ function UI.ClassName(classFile)
     return classNames[classFile] or ""
 end
 
--- A character as Blizzard's friends list writes it: "Zul'gor Bonecrusher Lvl 24 Warrior  Stranglethorn
--- Vale", the name in the character color, the class in its own, where in grey. name may be nil.
 function UI.CharacterLine(name, class, level, where)
     local parts = {}
-    if name then parts[1] = UI.Colored(name, UI.FriendColor("character")) end
+    if name then parts[1] = UI.Colored(UI.CharName(name), UI.FriendColor("character")) end
     if level then parts[#parts + 1] = UI.Colored("Lvl " .. level, UI.COLOR.white) end
     if class then parts[#parts + 1] = UI.Colored(UI.ClassName(class), UI.ClassColor(class) or UI.COLOR.text) end
     local line = table.concat(parts, " ")
@@ -378,14 +345,27 @@ function UI.CharacterLine(name, class, level, where)
     return line
 end
 
--- A line in chat in Blizzard's system color, like the game's own notices.
+-- Blizzard's raid warning in a frame of our own, as RareScanner does on Forever, so Blizzard's own (an
+-- Edit Mode frame) stays untouched; in Cinzel with an outline. Each line pops to maxHeight, holds for
+-- seconds minus Blizzard's 3-second fade, then fades.
+function UI.RaidWarning(maxHeight)
+    local f = CreateFrame("Frame", nil, UIParent, "RaidWarningFrameTemplate")
+    f:SetPoint("TOP", 0, -182)
+    f:UnregisterAllEvents()
+    f.maxTextHeight = maxHeight
+    function f:Warn(text, seconds)
+        self:AddMessage(text, ChatTypeInfo.RAID_WARNING, seconds)
+        self:GetLowestMessage():SetFontObject(family("number", 20, "OUTLINE"))
+    end
+    return f
+end
+
 function UI.Say(text)
     local c = ChatTypeInfo.SYSTEM
     DEFAULT_CHAT_FRAME:AddMessage("Death Tracker: " .. text, c.r, c.g, c.b)
 end
 
--- A link in a chat line: a click runs what UI.OnChatLink set for kind, with value. Blizzard hands an
--- addon's own links ("addon:...") to EventRegistry's SetItemRef (Blizzard_UIPanels_Game ItemRefHandlersShared).
+-- Blizzard hands an addon's own links ("addon:...") to EventRegistry's SetItemRef.
 local chatLinks = {}
 function UI.ChatLink(text, kind, value)
     return UI.Colored(("|Haddon:%s:%s:%s|h[%s]|h"):format(addonName, kind, value, text), UI.COLOR.link)
@@ -398,14 +378,12 @@ EventRegistry:RegisterCallback("SetItemRef", function(_, link)
     if prefix == "addon" and addon == addonName and chatLinks[kind] then chatLinks[kind](value) end
 end)
 
--- The popup formats its text with text_arg1.
 function UI.Ask(question, detail, onYes, onNo)
     StaticPopup_ShowCustomGenericConfirmation({ text = question .. "\n%s",
         text_arg1 = UI.Colored(detail, UI.COLOR.muted), callback = onYes, cancelCallback = onNo })
 end
 
--- Blizzard's popup puts its own box after its text, so ours (the box and the help) goes in under the
--- title. Typing can't change the text; a click selects it all again.
+-- Blizzard's popup puts its own edit box after its text, so ours goes in under the title.
 local COPY_POPUP = addonName .. "_COPY"
 local copy
 function UI.CopyBox(title, text, help)
@@ -469,8 +447,6 @@ local function tipLines(tooltip, title, text)
     GameTooltip_AddNormalLine(tooltip, text, true)
 end
 
--- Blizzard's right-click menu; fill(root) adds the items to Blizzard_Menu's root description.
--- has(frame), when given, says whether the menu has anything for the row the frame shows now.
 function UI.RightClickMenu(frame, fill, has)
     frame:SetScript("OnMouseUp", function(self, button)
         if button ~= "RightButton" or (has and not has(self)) then return end
@@ -482,7 +458,7 @@ function UI.MenuTooltip(element, title, text)
     element:SetTooltip(function(tooltip) tipLines(tooltip, title, text) end)
 end
 
--- Letter spacing, which game text lacks: a narrow space between every letter.
+-- Game text has no letter spacing.
 local SPACES = { hair = "\226\128\138", thin = "\226\128\137" }
 function UI.Spaced(text, width)
     return (text:gsub("[^\128-\191][\128-\191]*", "%0" .. SPACES[width]):sub(1, -4))
@@ -490,8 +466,6 @@ end
 
 function UI.Tint(text, color) text:SetTextColor(unpack(color)) end
 
--- One screen pixel thick at any scale, laid out on whole pixels, so a line doesn't thicken, thin or
--- shift while the window is resized (Altisan's UI.Divider; Blizzard's PixelUtil).
 local dividers = setmetatable({}, { __mode = "k" })
 
 local function fitDivider(line)
@@ -504,8 +478,7 @@ function UI.FitDividers()
 end
 
 -- The game rounds each texture corner to a screen pixel, so anything laid out between pixels comes
--- out a pixel thicker or thinner and shifts while resizing: lay the frame out on whole pixels
--- (Altisan's UI.RoundToPixels, as Blizzard's disableSharpening).
+-- out a pixel thicker or thinner and shifts while resizing.
 local function pixelRegion(region)
     region:SetRoundLayoutToNearestPixel(true)
     if region.SetSnapToPixelGrid then
@@ -534,8 +507,6 @@ function UI.Divider(parent, vertical, color)
     return t
 end
 
--- A rounded fill or 1 px edge of fixed-size corner pieces (Altisan's UI.RoundedBox), so the radius
--- stays the same at any size; on `to` when given, else on f. :SetColor(color), :SetShown(on).
 local ROUND_TEXTURE = 32
 local function roundedPieces(f, kind, radius, layer, inset, to)
     inset, to = inset or 0, to or f
@@ -578,7 +549,6 @@ function UI.RoundedFill(f, radius, layer, inset, to) return roundedPieces(f, "Fi
 
 function UI.RoundedEdge(f, radius, layer, to) return roundedPieces(f, "Edge", radius, layer, 0, to) end
 
--- A row's rounded tint: hover, selected, a list's top row.
 local ROW_RADIUS = 6
 function UI.RowFill(row, color)
     local fill = UI.RoundedFill(row, ROW_RADIUS, nil, 1)
@@ -586,7 +556,6 @@ function UI.RowFill(row, color)
     return fill
 end
 
--- Blizzard's quest window parchment, as a button: tip(self) on mouse-over.
 function UI.Parchment(parent, width, height, tip, onClick)
     local b = CreateFrame("Button", nil, parent)
     b:SetSize(width, height)
@@ -599,7 +568,6 @@ function UI.Parchment(parent, width, height, tip, onClick)
     return b
 end
 
--- Blizzard's quest text, black on parchment: its title font (Morpheus) or its body font (Friz).
 function UI.QuestText(parent, kind, size)
     local t = parent:CreateFontString(nil, "OVERLAY", kind == "title" and "QuestTitleFont" or "QuestFont")
     local file, _, flags = t:GetFont()
@@ -608,7 +576,6 @@ function UI.QuestText(parent, kind, size)
     return t
 end
 
--- Blizzard has no drop shadow for a frame on Forever (the bank's shadow is an inner edge).
 UI.SHADOW = { edge = 16, margin = 24 }
 function UI.Shadow(frame, drop)
     local edge, margin = UI.SHADOW.edge, UI.SHADOW.margin
@@ -622,8 +589,7 @@ function UI.Shadow(frame, drop)
     return t
 end
 
--- A rubber stamp across a parchment: Media/Stamp's frame is drawn tilted; the text turns to match.
--- Returns it hidden, and slam(onHit), which drops it in and calls onHit as it lands.
+-- Media/Stamp's frame is drawn tilted; the text turns to match.
 UI.STAMP_TILT = 12
 local SLAM = { from = 2.5, time = 0.2, fade = 0.1 }
 function UI.Stamp(parent, text, color)
@@ -661,7 +627,6 @@ function UI.Stamp(parent, text, color)
     end
 end
 
--- Blizzard's nameplate marks by rank, as Blizzard_NamePlateClassificationFrame maps them on Forever.
 local RANK_ATLAS = { elite = "nameplates-icon-elite-gold", worldboss = "nameplates-icon-elite-gold",
     rareelite = "nameplates-icon-elite-silver", rare = "UI-HUD-UnitFrame-Target-PortraitOn-Boss-Rare-Star" }
 function UI.RankMark(parent, size)
@@ -671,7 +636,6 @@ function UI.RankMark(parent, size)
     return t
 end
 
--- Shows the rank's mark, or hides it for a normal mob or an unknown rank; true when shown.
 function UI.SetRank(mark, rank)
     local atlas = RANK_ATLAS[rank]
     mark:SetShown(atlas ~= nil)
@@ -679,15 +643,12 @@ function UI.SetRank(mark, rank)
     return atlas ~= nil
 end
 
--- The mark inside a line of text, as a tooltip's title carries it.
 function UI.RankMarkup(rank, size)
     local atlas = RANK_ATLAS[rank]
     return atlas and CreateAtlasMarkup(atlas, size, size) .. " " or ""
 end
 
--- A PlayerModel answers for an NPC ID only once the mob's model loads, a moment later: ask(npc, read,
--- done) calls read(model) every 0.1 s until it gives a number above 0, then done(it); after tries,
--- done(nil). A new ask (or ask(nil)) ends the one before with done(nil).
+-- A PlayerModel answers for an NPC ID only once the mob's model loads, a moment later.
 function UI.CreatureProbe(parent, tries)
     local probe = CreateFrame("PlayerModel", nil, parent)
     probe:SetSize(1, 1)
@@ -718,10 +679,7 @@ function UI.CreatureProbe(parent, tries)
     return ask
 end
 
--- Once a model loads, the camera's own projection says how far it reaches from the frame's middle: its
--- top and bottom on its centre line, and half its box's widest side across the screen as it turns. A
--- box's corners are mostly empty (a harpy's wings), so its diagonal would shrink the model.
--- Projected points are screen pixels from the frame's bottom left, as Blizzard's PartyPoseUI reads them.
+-- Transform3DPointTo2D gives screen pixels from the frame's bottom left (as PartyPoseUI reads it).
 local function fitScale(scene, actor, fill)
     local x1, y1, z1, x2, y2, z2 = actor:GetActiveBoundingBox()
     if not z2 or z2 <= z1 then return end
@@ -742,9 +700,7 @@ local function fitScale(scene, actor, fill)
     return actor:GetScale()
 end
 
--- A scene actor needs a display ID, which the probe gives for an NPC ID.
--- Returns the scene and show(npc, alpha, fill, display): fill is the share of the frame the model
--- may take (default UI.MODEL_FILL); a display ID skips the NPC lookup.
+-- A scene actor needs a display ID; the probe gives it for an NPC ID.
 local PET_SCENE = 753
 UI.MODEL_FILL = 0.9
 function UI.Model(parent, width, height)
@@ -785,7 +741,6 @@ function UI.Box(parent, width)
     return b
 end
 
--- template: Blizzard's own close button (UIPanelCloseButton) instead of our ×.
 function UI.CloseButton(parent, tooltip, onClick, template)
     local b = CreateFrame("Button", nil, parent, template)
     b.tooltip = tooltip
@@ -811,7 +766,7 @@ function UI.CloseButton(parent, tooltip, onClick, template)
     return b
 end
 
--- It needs a width: the game doesn't draw a frame without one, nor what's in it.
+-- The game doesn't draw a frame without a width, nor what's in it.
 ---@class DeathTrackerRow: Frame
 ---@field Set fun(self: DeathTrackerRow, ...: any)
 ---@field label FontString
@@ -843,8 +798,6 @@ function UI.Pair(parent, size, width)
         { "label", "body", size, "muted" }, { "value", "bold", size, "text" }, { "tail", "body", size, "muted" } })
 end
 
--- A pair whose value, too long for its line, goes on under the label ("Nemesis Corrupted
--- Bloodtalon" / "Scythemaw"); font: the value's, bold at first.
 function UI.WrapPair(parent, size, width, font)
     font = font or "bold"
     local r = UI.Row(parent, width, size * 0.3, { { "label", "body", size, "muted" }, { "value", font, size, "text" } })
@@ -872,21 +825,17 @@ function UI.WrapPair(parent, size, width, font)
     return r
 end
 
--- Where the frame's top centre is, from the screen's: so a frame whose width changes grows both ways.
 local function topCentre(frame)
     local s = frame:GetScale()
     return { point = "TOP", x = frame:GetLeft() + frame:GetWidth() / 2 - UIParent:GetWidth() / 2 / s,
         y = frame:GetTop() - UIParent:GetTop() / s }
 end
 
--- Where a frame stands: where it was dropped (store), else its default spot.
 function UI.Home(store, point, x, y, under)
     if store.point then return { point = store.point, x = store.x, y = store.y } end
     return { point = point, x = x, y = y, to = under and under[1], toPoint = under and under[2] }
 end
 
--- Its first spot is point, x, y on the screen, or under another frame (under = { frame, point });
--- grow = "centre" keeps its top centre where the player puts it.
 function UI.Movable(frame, store, point, x, y, under, grow)
     frame.home = UI.Home(store, point, x, y, under)
     frame.spot, frame.grow = store, grow
@@ -911,8 +860,7 @@ function UI.Movable(frame, store, point, x, y, under, grow)
     end)
 end
 
--- The template would resize the frame; these layouts are fixed, so its start and stop hooks turn
--- the drag into a scale between min and max, keeping the top-left corner.
+-- The template would resize the frame; its start and stop hooks turn the drag into a scale instead.
 function UI.ResizeGrip(frame, store, key, min, max)
     local g = CreateFrame("Button", nil, frame, "PanelResizeButtonTemplate")
     g:SetPoint("BOTTOMRIGHT", -3, 3)
@@ -953,8 +901,6 @@ function UI.ResizeGrip(frame, store, key, min, max)
     return g
 end
 
--- A toast rises in, stays 7 seconds (or hold) and fades out by itself. With the mouse over it, or
--- while stays() says so, it waits at full strength. Returns the function that starts it.
 local TOAST = { rise = 0.35, hold = 7, fade = 0.8, height = 16 }
 function UI.Toast(frame, close, stays, hold)
     local age, risen = 0, false
@@ -996,9 +942,8 @@ function UI.Offset(frame, dy)
     frame:SetPoint(h.point, h.to or UIParent, h.toPoint or h.point, h.x, h.y + dy)
 end
 
--- The addon's page in Esc, Options, AddOns, drawn by the addon in Blizzard's look (sizes from
--- Blizzard_SettingControls and Blizzard_SettingsList). Blizzard's settings list shares its rows with every page, and once an
--- addon fills them, Blizzard's Discord checkbox on the Audio page is blocked and blames the addon.
+-- Never Blizzard's settings list: its rows are shared by every page, and once an addon fills them,
+-- the Discord checkbox on the Audio page is blocked and blames the addon.
 local OPTION = { row = 26, header = 45, gap = 9, pad = 10, indent = 15, button = 200, buttonPad = 32, buttonGap = 8 }
 
 local function optionOn(def)
@@ -1053,8 +998,8 @@ function OPTION_ROW.header(_, frame, def)
     title:SetText(def.label)
 end
 
--- Blizzard's checkbox with our own tooltip: the template's would write to SettingsTooltip, which
--- other pages share and our code would taint. So the row's highlight is ours to show.
+-- The template's tooltip writes to SettingsTooltip, which other pages share and our code would
+-- taint, so the row's highlight is ours to show.
 function OPTION_ROW.check(row, frame, def, refresh)
     optionLabel(row, frame, def)
     local box = CreateFrame("CheckButton", nil, frame, "SettingsCheckboxTemplate")
@@ -1079,8 +1024,6 @@ function OPTION_ROW.check(row, frame, def, refresh)
     row.control = box
 end
 
--- Blizzard's red button with gold text (UIPanelButtonTemplate); title and tip (text or function) make
--- its tooltip.
 function UI.Button(parent, text, width, height, onClick, title, tip)
     local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     button:SetSize(width, height)
@@ -1093,9 +1036,7 @@ function UI.Button(parent, text, width, height, onClick, title, tip)
     return button
 end
 
--- Blizzard's red button that opens a menu above itself (a DropdownButton, as the Filter button):
--- fill(root) builds it, also whenever the button shows, so it only reads; onOpen() runs as it opens.
--- Refresh() rebuilds an open menu in place.
+-- Blizzard runs fill(root) whenever the button shows, not only on a click, so it only reads.
 function UI.MenuButton(parent, text, width, height, fill, onOpen)
     local b = CreateFrame("DropdownButton", nil, parent, "UIPanelButtonTemplate")
     b:SetSize(width, height)
@@ -1128,7 +1069,6 @@ function OPTION_ROW.button(row, frame, def, refresh)
     end
 end
 
--- Each as wide as its text, side by side; one that doesn't fit the page's width starts a new line.
 function OPTION_ROW.buttons(row, frame, def)
     optionLabel(row, frame, def)
     row.buttons = {}
@@ -1153,7 +1093,6 @@ function OPTION_ROW.buttons(row, frame, def)
     end
 end
 
--- Blizzard's dropdown: choices ({ value, text }, or a function that returns them) as radio items.
 function UI.Dropdown(parent, width, choices, get, set)
     local d = CreateFrame("DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
     d:SetWidth(width)
@@ -1165,7 +1104,6 @@ function UI.Dropdown(parent, width, choices, get, set)
     return d
 end
 
--- With the page's own tooltip, as on the checkbox.
 function OPTION_ROW.dropdown(row, frame, def)
     optionLabel(row, frame, def)
     local d = UI.Dropdown(frame, 160, def.choices, def.get, def.set)
@@ -1175,7 +1113,6 @@ function OPTION_ROW.dropdown(row, frame, def)
     row.control = d
 end
 
--- Blizzard's slider with steppers, its value on the right, placed as on Blizzard's own pages.
 function OPTION_ROW.slider(row, frame, def)
     optionLabel(row, frame, def)
     local s = CreateFrame("Frame", nil, frame, "MinimalSliderWithSteppersTemplate")
@@ -1190,12 +1127,6 @@ function OPTION_ROW.slider(row, frame, def)
     row.control = s
 end
 
--- defs: { kind = "header" | "check" | "dropdown" | "slider" | "button" | "buttons", label,
--- tooltip (text or function), ... }; a check, a dropdown or a slider has get, set and under (the check
--- it sits under), a dropdown also choices ({ value, text }), a slider min, max, step and format, a
--- button text, click, isOn, isNew (Blizzard's NEW label beside it) and note (a last tooltip line in
--- green); "buttons" a list of { text, tooltip, click, isOn }, side by side.
--- page.rows: what's drawn.
 function UI.OptionsPage(title, defs, onDefaults)
     local page = CreateFrame("Frame")
     page:Hide()
@@ -1234,7 +1165,6 @@ function UI.OptionsPage(title, defs, onDefaults)
         OPTION_ROW[def.kind](row, frame, def, page.Refresh)
         page.rows[i] = row
     end
-    -- A row of buttons can need a second line, known once the page has a width.
     local function layoutRows(width)
         local y = OPTION.pad
         for _, row in ipairs(page.rows) do
@@ -1251,7 +1181,7 @@ function UI.OptionsPage(title, defs, onDefaults)
     layoutRows(content:GetWidth())
     content:HookScript("OnSizeChanged", function(_, width) layoutRows(width) end)
     scroll()
-    -- The options window calls these: on showing the page, and from its own "reset all settings".
+    -- Blizzard's options window calls these: as the page shows, and from its "reset all settings".
     page.OnRefresh = page.Refresh
     page.OnDefault = function()
         for _, row in ipairs(page.rows) do
@@ -1260,7 +1190,6 @@ function UI.OptionsPage(title, defs, onDefaults)
         page.Refresh()
     end
     page.Refresh()
-    -- One row's control glows, from a link elsewhere, until it's clicked or the settings close.
     function page.Glow(key)
         for _, row in ipairs(page.rows) do
             if row.def.key == key then
@@ -1280,7 +1209,6 @@ function UI.OptionsPage(title, defs, onDefaults)
     return page
 end
 
--- Pages go on f.Inset, top pixels down. Escape closes it.
 function UI.Window(name, width, height, top, store)
     local f = CreateFrame("Frame", name, UIParent, "ButtonFrameTemplate")
     f:SetSize(width, height)
@@ -1299,8 +1227,6 @@ function UI.Window(name, width, height, top, store)
     return f
 end
 
--- Down the window's right edge, under the one before. text may be a function, read on mouse-over.
--- note(), when given, can add a white line above the text (what's new on that page).
 function UI.SideTab(window, icon, title, text, onClick, note)
     local t = CreateFrame("Frame", nil, window, "LargeSideTabButtonTemplate")
     local above = window.sideTabs[#window.sideTabs]
@@ -1353,7 +1279,6 @@ function UI.TextButton(parent, text, onClick, title, tip)
     return b
 end
 
--- Blizzard's new-item glow from the bags ("bags-glow-white"), tinted gold.
 function UI.Glow(frame)
     local glow = frame:CreateTexture(nil, "OVERLAY")
     glow:SetAtlas("bags-glow-white")
@@ -1373,7 +1298,6 @@ function UI.Glow(frame)
     return glow
 end
 
--- text may be a function, read on mouse-over.
 function UI.HelpTip(owner, title, text, anchor)
     GameTooltip:SetOwner(owner, anchor or "ANCHOR_RIGHT")
     tipLines(GameTooltip, title, type(text) == "function" and text() or text)
@@ -1385,8 +1309,7 @@ local function hoverTip(frame, title, text)
     frame:HookScript("OnLeave", hideTooltip)
 end
 
--- A frame under the mouse takes its clicks even with only motion on; propagating hands them to the
--- parent (a movable frame's drag and right-click menu).
+-- A frame takes the clicks under it even with only mouse motion on; propagating passes them on.
 function UI.TipSpot(parent, title, text)
     local f = CreateFrame("Frame", nil, parent)
     f:SetMouseMotionEnabled(true)
@@ -1395,9 +1318,6 @@ function UI.TipSpot(parent, title, text)
     return f
 end
 
--- Blizzard's Filter button (WowStyle1FilterDropdownTemplate): fill(root) builds its menu. Its red X
--- shows while isDefault() is false and calls reset(); changed() runs after any change. resetTip: the
--- red X's tooltip text, or a function for it.
 function UI.FilterButton(parent, fill, isDefault, reset, changed, resetTip)
     local b = CreateFrame("DropdownButton", nil, parent, "WowStyle1FilterDropdownTemplate")
     b:SetupMenu(function(_, root) fill(root) end)
@@ -1433,7 +1353,26 @@ end
 
 function UI.Money(copper) return GetMoneyString(copper, true) end
 
--- 1st, 2nd, 3rd, 11th, 16th, 22nd.
+local BIG_COINS = { "Coin-Gold", "Coin-Silver", "Coin-Copper" }
+local BIG_COIN, BIG_COIN_DROP, BIG_COIN_GAP = 20, 0, 3
+-- An inline texture's size and offsets grow with the font: one unit is the font size / 12.15
+-- (measured: "20" drew 82 wide at 50 pt and 26 at 16 pt).
+local INLINE_UNIT = 12.15
+
+-- GetMoneyString draws its 16 px coins as tall as the text; Forever's largest coins are these 20 px atlases.
+function UI.BigMoney(copper, fontSize)
+    if C_CVar.GetCVarBool("colorblindMode") then return UI.Money(copper) end
+    local unit = fontSize / INLINE_UNIT
+    local size, gap, drop = Round(BIG_COIN / unit), Round(BIG_COIN_GAP / unit), Round(BIG_COIN_DROP / unit)
+    local amounts, parts = { math.floor(copper / 10000), math.floor(copper / 100) % 100, copper % 100 }, {}
+    for i, n in ipairs(amounts) do
+        if n > 0 or (i == 3 and #parts == 0) then
+            parts[#parts + 1] = BreakUpLargeNumbers(n) .. CreateAtlasMarkup(BIG_COINS[i], size, size, gap, drop)
+        end
+    end
+    return table.concat(parts, " ")
+end
+
 function UI.Ordinal(n)
     local tens = n % 100
     return n .. ((tens >= 11 and tens <= 13) and "th" or ({ "st", "nd", "rd" })[n % 10] or "th")
@@ -1441,16 +1380,11 @@ end
 
 function UI.TipPair(label, value) return UI.Colored(label, UI.COLOR.muted) .. " " .. UI.Colored(value, UI.COLOR.white) end
 
--- An icon inside a line of text.
 function UI.IconMarkup(icon, size) return CreateSimpleTextureMarkup(icon, size, size) end
 
 function UI.TipLine(tooltip, text, color) GameTooltip_AddColoredLine(tooltip, text, CreateColor(unpack(color))) end
 
--- Blizzard's tooltip: a title in its color (Blizzard's gold without one: its own default is white),
--- then lines in white (a line may carry its own colors; { text, color, right = text } puts text on
--- the right too, in the same color). It follows the cursor unless given an anchor: a SetOwner
--- anchor, or a frame to sit just outside of, level with the owner's top.
--- help: what a click does, last, in Blizzard's gold.
+-- GameTooltip_SetTitle's own default color is white, not Blizzard's gold.
 function UI.Tooltip(owner, title, color, lines, help, anchor)
     if type(anchor) == "table" then
         GameTooltip:SetOwner(owner, "ANCHOR_NONE")
@@ -1485,7 +1419,6 @@ function UI.Join(...)
     return table.concat(out, ", ")
 end
 
--- A list row in two lines: row.title and row.right, then row.line2 and row.right2 under them.
 function UI.RowLines(row, rightSize)
     row.title = UI.GameText(row, "normal", "text")
     row.title:SetPoint("TOPLEFT", 8, -7)
@@ -1499,7 +1432,6 @@ function UI.RowLines(row, rightSize)
     row.line2:SetWordWrap(false)
 end
 
--- A stat on one line: a gold label, row.value at the right, a pixel line under it.
 UI.STAT_ROW = 32
 function UI.StatRow(row)
     row.label = UI.GameText(row, "normal", "muted")
@@ -1512,43 +1444,61 @@ function UI.StatRow(row)
     row.line:SetPoint("BOTTOMRIGHT", -4, 0)
 end
 
--- A row in the history window's left pane: a name, a small level after it, a count at the right.
--- width: the row's, so a long name ends in "..." clear of its level and count; the row's tooltip
--- carries the full name (Blizzard's friends list does the same).
 function UI.PaneRow(row, width)
     row.width = width
     row.name = UI.GameText(row, "normal", "text")
     row.name:SetPoint("LEFT", 8, 0)
     row.name:SetWordWrap(false)
+    row.faction = row:CreateTexture(nil, "ARTWORK")
+    row.faction:SetSize(UI.FACTION_ICON, UI.FACTION_ICON)
     row.level = UI.GameText(row, "small", "faint")
     row.level:SetPoint("LEFT", row.name, "RIGHT", 5, 0)
     row.count = UI.GameText(row, "normal", "text")
     row.count:SetPoint("RIGHT", -8, 0)
 end
 
--- indent: the row belongs to the group row above it.
-function UI.FillPaneRow(row, name, color, level, count, selected, indent)
-    local left = indent and 20 or 8
+UI.FACTION_ICON = 18
+UI.FACTION_ATLAS = { Alliance = "UI-HUD-UnitFrame-Player-PVP-AllianceIcon", Horde = "UI-HUD-UnitFrame-Player-PVP-HordeIcon" }
+UI.FACTION_ASPECT = { Alliance = 28 / 41, Horde = 1 }
+UI.FACTION_INLINE = 14
+
+function UI.FactionMarkup(faction)
+    local atlas = faction and UI.FACTION_ATLAS[faction]
+    if not atlas then return "" end
+    return CreateAtlasMarkup(atlas, math.floor(UI.FACTION_INLINE * UI.FACTION_ASPECT[faction] + 0.5), UI.FACTION_INLINE) .. " "
+end
+
+function UI.CharName(name)
+    if not name then return nil end
+    return UI.FactionMarkup(ns.CharFaction and ns.CharFaction(name)) .. name
+end
+
+function UI.FillPaneRow(row, name, color, level, count, selected, indent, faction)
+    local atlas = faction and UI.FACTION_ATLAS[faction]
+    local left, width = (indent and not atlas) and 20 or 8, row:GetWidth() > 0 and row:GetWidth() or row.width
+    row.faction:SetShown(atlas ~= nil)
+    if atlas then
+        row.faction:SetAtlas(atlas)
+        row.faction:SetSize(UI.FACTION_ICON * UI.FACTION_ASPECT[faction], UI.FACTION_ICON)
+        row.faction:SetPoint("LEFT", left + (UI.FACTION_ICON - UI.FACTION_ICON * UI.FACTION_ASPECT[faction]) / 2, 0)
+        left = left + UI.FACTION_ICON + 3
+    end
     row.name:SetPoint("LEFT", left, 0)
     row.name:SetText(name)
     UI.Tint(row.name, color or UI.COLOR.text)
     row.level:SetText(level or "")
     row.count:SetText(count)
-    local room = row.width - left - 8 - row.count:GetUnboundedStringWidth() - 10
+    local room = width - left - 8 - row.count:GetUnboundedStringWidth() - 10
         - ((level or "") ~= "" and row.level:GetUnboundedStringWidth() + 5 or 0)
     row.name:SetWidth(math.max(0, math.min(math.ceil(row.name:GetUnboundedStringWidth()) + 1, math.floor(room))))
     row.tint = selected and UI.COLOR.selected or nil
 end
 
--- "Nizy (Nizy Aura)" as Blizzard's friends list writes a Battle.net friend: the BattleTag in Battle.net
--- blue, the character in the WoW name color. Without a BattleTag, the character alone.
 function UI.FriendName(tag, char)
     local name = UI.Colored(tag and "(" .. char .. ")" or char, UI.FriendColor("character"))
     return tag and UI.Colored(tag, UI.FriendColor("bnet")) .. " " .. name or name
 end
 
--- A small heading over a group of pane rows (a ruleset, Battle.net); item.text, and item.selected when
--- a click on it picks the group.
 function UI.PaneHeading(row)
     row.text = UI.GameText(row, "normal", "muted")
     row.text:SetPoint("BOTTOMLEFT", 8, 5)
@@ -1557,15 +1507,12 @@ function UI.PaneHeading(row)
     row.line:SetPoint("BOTTOMRIGHT", -8, 1)
 end
 
--- A heading item without text is the space between two sections.
 function UI.FillPaneHeading(row, item)
     row.text:SetText(item.text or "")
     row.line:SetShown(item.text ~= nil)
     row.tint = item.selected and UI.COLOR.selected or nil
 end
 
--- A GroupRow as a faint line closing a list, saying what it leaves out (item.text). A fill that shows
--- the row as a heading again calls UI.FillGroupHeading.
 function UI.FillNote(row, item)
     row.title:SetText("")
     row.summary:SetText(item.text)
@@ -1580,7 +1527,6 @@ function UI.FillGroupHeading(row, title, summary)
     row.line:Show()
 end
 
--- RowLines with a faint rank number before the title (a leaderboard): row.rank.
 function UI.RankedRow(row)
     UI.RowLines(row)
     row.rank = UI.GameText(row, "normal", "faint")
@@ -1589,7 +1535,6 @@ function UI.RankedRow(row)
     row.line2:SetPoint("TOPLEFT", 30, -23)
 end
 
--- A heading in a list: row.title, row.summary beside it, a line under both.
 function UI.GroupRow(row)
     row.title = UI.GameText(row, "normal", "text")
     row.title:SetPoint("BOTTOMLEFT", 0, 7)
@@ -1600,7 +1545,6 @@ function UI.GroupRow(row)
     row.line:SetPoint("RIGHT")
 end
 
--- Blizzard's tabs on top of what they switch; onPick(index) on a click.
 function UI.Tabs(parent, names, onPick)
     local t = CreateFrame("Frame", nil, parent, "TabSystemTemplate")
     -- OnLoad already made its pool with the default tabs, which hang below a frame.
@@ -1630,10 +1574,6 @@ function UI.Tabs(parent, names, onPick)
     return t
 end
 
--- Tabs over one list, shown only when more than one list has rows. Show(lists) draws the picked
--- list, or the only one with rows, and says whether any had rows. labelOf(i, items), when given,
--- names a tab instead of its name and row count. emptyOf(i), when given, keeps a picked tab with no
--- rows picked and says why it's empty, instead of showing another tab's rows.
 function UI.TabbedList(parent, names, kinds, onPick, labelOf, emptyOf)
     local view = { pick = 1 }
     view.tabs = UI.Tabs(parent, names, function(id)
@@ -1681,7 +1621,6 @@ function UI.TabbedList(parent, names, kinds, onPick, labelOf, emptyOf)
     return view
 end
 
--- The scroll bar only while its box has more than fits, and never without its box.
 local function barWhenNeeded(box, bar)
     local function fit() bar:SetShown(box:IsShown() and box:HasScrollableExtent()) end
     local owner = {}
@@ -1692,9 +1631,7 @@ local function barWhenNeeded(box, bar)
     fit()
 end
 
--- Blizzard's scroll box (WowScrollBox, MinimalScrollBar) around one frame of fixed rows, which
--- takes the box's width. Returns the box, the frame, and the function that starts the scrolling
--- once the frame has its height.
+UI.WHEEL_STEP = 30
 function UI.ScrollArea(parent)
     local box = CreateFrame("Frame", nil, parent, "WowScrollBox")
     local bar = CreateFrame("EventFrame", nil, parent, "MinimalScrollBar")
@@ -1704,17 +1641,14 @@ function UI.ScrollArea(parent)
     content.scrollable = true
     box:HookScript("OnSizeChanged", function(_, width) content:SetWidth(width) end)
     return box, content, function()
-        ScrollUtil.InitScrollBoxWithScrollBar(box, bar, CreateScrollBoxLinearView())
+        local view = CreateScrollBoxLinearView()
+        -- Blizzard's view steps the wheel by its first frame's height; ours holds one frame, the whole page.
+        view:SetPanExtent(UI.WHEEL_STEP)
+        ScrollUtil.InitScrollBoxWithScrollBar(box, bar, view)
         barWhenNeeded(box, bar)
     end
 end
 
--- Blizzard's scroll list (WowScrollBoxList, MinimalScrollBar) of mixed items. kinds:
--- { [kind] = { template = "Button" or "Frame", extent (or extent(item)), build(frame), fill(frame, item), tip(frame, item) } },
--- one kind per template, since frames are reused by template; each item's .kind picks one. A row
--- with a tip shows the hover tint under the mouse (its own row.lit texture instead, if it has one), else
--- its own tint (row.tint, a color or nil).
--- barGap: how far right of the list its scroll bar sits.
 function UI.List(parent, kinds, barGap)
     local anyTip = false
     for _, k in pairs(kinds) do anyTip = anyTip or k.tip ~= nil end
@@ -1765,9 +1699,20 @@ function UI.List(parent, kinds, barGap)
     ScrollUtil.InitScrollBoxListWithScrollBar(list.box, list.bar, view)
     barWhenNeeded(list.box, list.bar)
     function list.Set(items)
+        list.items = items
         list.box:SetDataProvider(CreateDataProvider(items), ScrollBoxConstants.RetainScrollPosition)
     end
-    -- Scrolls the row whose item matches into view.
+    function list.Fit(width)
+        local function size()
+            local w = width - (list.bar:IsShown() and list.bar:GetWidth() + (barGap or 8) or 0)
+            if list.box:GetWidth() == w then return end
+            list.box:SetWidth(w)
+            if list.items then list.Set(list.items) end
+        end
+        list.bar:HookScript("OnShow", size)
+        list.bar:HookScript("OnHide", size)
+        size()
+    end
     function list.Reveal(matches)
         if list.box.ScrollToElementDataByPredicate then
             list.box:ScrollToElementDataByPredicate(matches, ScrollBoxConstants.AlignCenter)
@@ -1784,8 +1729,7 @@ function UI.List(parent, kinds, barGap)
     return list
 end
 
--- Blizzard's Legacy Challenges art (Forever's own achievement look), drawn by our frames: Blizzard's
--- rows read real achievement IDs (docs/research/reports/Achievement window look 2026-11-12.md).
+-- Blizzard's achievement rows read real achievement IDs, so these are our own frames.
 local function atlas(parent, name, layer, sub)
     local t = parent:CreateTexture(nil, layer or "ARTWORK", nil, sub)
     t:SetAtlas(name)
@@ -1798,11 +1742,8 @@ local function checkMark(parent)
     return t
 end
 
--- "7 / 10".
 function UI.Fraction(n, goal) return ("%s / %s"):format(BreakUpLargeNumbers(n), BreakUpLargeNumbers(goal)) end
 
--- A progress bar, its count in the middle: bar:Set(n, goal, text), text when not "7 / 10". The
--- green is its own rounded fill, so it keeps the track's corners; a square end until it's full.
 local BAR_RADIUS = 4
 function UI.ProgressBar(parent, width, height)
     local b = CreateFrame("Frame", nil, parent)
@@ -1836,10 +1777,6 @@ function UI.ProgressBar(parent, width, height)
     return b
 end
 
--- The history window's details on the right of a page, filled top to bottom after Begin(): Title,
--- Line, Stats, Label, Hit, Pick (a row; clickable with onClick), Button; Done() sets the height.
--- Rows are kept and reused between fills.
--- A hit: its icon in Blizzard's frame, the name and note centred on it, the bar under them.
 local DETAIL = { pad = 14, hit = 46, hitShort = 34, pick = 20, icon = 32, text = 36, gap = 8 }
 function UI.DetailsPanel(parent, width)
     local p = CreateFrame("Frame", nil, parent)
@@ -1901,7 +1838,6 @@ function UI.DetailsPanel(parent, width)
         putNext(t, t:GetStringHeight(), 2)
     end
 
-    -- A death's joke, in the death card's italic gold.
     function p:Quip(value)
         local t = reuse("quip", function()
             local q = UI.Text(content, "italic", 14, "joke")
@@ -1914,7 +1850,6 @@ function UI.DetailsPanel(parent, width)
         putNext(t, t:GetStringHeight(), 2)
     end
 
-    -- stats: { { label, value }, ... } in a row, between two lines.
     function p:Stats(stats)
         y = y + DETAIL.gap - 2
         local top = reuse("rule", function() return UI.Divider(content) end)
@@ -1941,11 +1876,8 @@ function UI.DetailsPanel(parent, width)
         putNext(t, t:GetStringHeight(), 8)
     end
 
-    -- Room between two groups of lines.
     function p:Space(px) y = y + px end
 
-    -- hit: { icon, name, note, amount, part = health left 0 to 1 or nil for no bar, spellId and tipLine
-    -- for Blizzard's spell tooltip }.
     function p:Hit(hit)
         local r = reuse("hit", function()
             local f = CreateFrame("Frame", nil, content)
@@ -1978,7 +1910,6 @@ function UI.DetailsPanel(parent, width)
         r.icon:SetShown(hit.icon ~= nil)
         r.frame:SetShown(hit.icon ~= nil)
         local left = hit.icon and DETAIL.text or 0
-        -- Without a note the name alone is centred on the icon.
         local nameY = (hit.note or "") == "" and -9 or -4
         r.name:SetPoint("TOPLEFT", left, nameY)
         r.amount:SetPoint("TOPRIGHT", 0, nameY)
@@ -1998,7 +1929,6 @@ function UI.DetailsPanel(parent, width)
         putNext(r, height, 6)
     end
 
-    -- A row: left text in its color, right text; onClick makes it a button with a hover tint and tip.
     function p:Pick(left, color, right, onClick, tipTitle, tip)
         local r = reuse("pick", function()
             local f = CreateFrame("Button", nil, content)
@@ -2053,19 +1983,15 @@ function UI.DetailsPanel(parent, width)
     return p
 end
 
--- Blizzard's classic achievement shield (Interface\AchievementFrame), gold when earned, grey before.
 local SHIELDS = "Interface\\AchievementFrame\\UI-Achievement-Shields"
 
--- The gold shield in a line of text, after a number of points.
 function UI.ShieldMarkup(size) return CreateTextureMarkup(SHIELDS, 128, 128, size, size, 0, 0.5, 0, 0.5) end
 UI.CARD = 80
 UI.CARD_CELL = 22
 UI.CARD_CELLS = 10
 local CARD_PAD, CELL_GAP, CARD_TEXT, CARD_RIGHT = 8, 4, 74, 70
--- A card's name, goal and bar, top to bottom, and the space between them.
 local CARD_NAME, CARD_LINE, CARD_BAR, CARD_GAP = 14, 12, 14, 7
 
--- A step cell's text inset, its check's inset, and the gap between them.
 local CELL_LEFT, CELL_RIGHT, CHECK_GAP = 8, 6, 4
 
 function UI.CardHeight(cells) return UI.CARD + math.ceil(cells / 2) * (UI.CARD_CELL + CELL_GAP) + CARD_PAD end
@@ -2091,7 +2017,6 @@ local function cardCells(row, c)
     end
     row:HookScript("OnSizeChanged", function(_, width)
         c.ribbon:SetWidth(width * 0.78)
-        -- Cells start under the name and end as far from the right edge: centred on the card.
         for _, cell in ipairs(c.cells) do
             cell:SetWidth((width - 2 * CARD_TEXT - CELL_GAP) / 2)
             cell.text:SetWidth(cell:GetWidth() - CELL_LEFT - CHECK_GAP - cell.check:GetWidth() - CELL_RIGHT)
@@ -2100,10 +2025,6 @@ local function cardCells(row, c)
     end)
 end
 
--- A trophy as a card in a list row: card:Set(t), t = { earned, name, line, icon, points, date,
--- progress = { n, goal, text } or nil, open, cells = { { text, done }, ... } shown while open }.
--- An icon in Blizzard's round-cornered frame from Legacy Challenges; size is the frame's. Returns the
--- frame (to place) and the icon (to set).
 function UI.FramedIcon(parent, size)
     local frame = atlas(parent, "Legacy-Tree-Frame-icon-frame", "OVERLAY")
     frame:SetSize(size, size)
@@ -2132,7 +2053,6 @@ function UI.TrophyCard(row)
     c.line:SetWordWrap(false)
     c.bar = UI.ProgressBar(row, 250)
     c.bar:SetPoint("TOPLEFT", CARD_TEXT + 4, -52)
-    -- The same spot on every card, under the date.
     c.shield = row:CreateTexture(nil, "ARTWORK")
     c.shield:SetTexture(SHIELDS)
     c.shield:SetSize(52, 52)
@@ -2170,7 +2090,6 @@ function UI.TrophyCard(row)
         UI.Tint(self.line, t.earned and UI.COLOR.text or UI.COLOR.faint)
         self.bar:SetShown(t.progress ~= nil)
         if t.progress then self.bar:Set(t.progress[1], t.progress[2], t.progress[3]) end
-        -- Name, goal and bar as one block in the middle of the card's height, with or without a bar.
         local block = CARD_NAME + CARD_GAP + CARD_LINE + (t.progress and CARD_GAP + CARD_BAR or 0)
         local y = -math.floor((UI.CARD - block) / 2)
         self.title:SetPoint("TOPLEFT", CARD_TEXT, y)
@@ -2197,7 +2116,6 @@ function UI.TrophyCard(row)
     return c
 end
 
--- A row in a page's own pane as Blizzard's category tab: row.name, row.count.
 function UI.TabRow(row)
     row.tab = atlas(row, "Legacy-Challenge-Left-Sub-Tab", "BACKGROUND")
     row.tab:SetPoint("TOPLEFT", 0, -1)
@@ -2208,8 +2126,6 @@ function UI.TabRow(row)
     row.count:SetPoint("RIGHT", -10, 0)
 end
 
--- indent: a subgroup, under its group, smaller.
--- As Blizzard's achievement categories: a group's name in gold, a subgroup's in white, a little in.
 function UI.FillTabRow(row, name, count, selected, indent)
     row.tab:SetPoint("TOPLEFT", indent and 8 or 0, -1)
     row.tab:SetAtlas(selected and "Legacy-Challenge-Left-Sub-Tab-selected" or "Legacy-Challenge-Left-Sub-Tab")
@@ -2218,12 +2134,6 @@ function UI.FillTabRow(row, name, count, selected, indent)
     row.count:SetText(count)
 end
 
--- A short movie in a frame in the middle of the screen: each slide moves on by itself, a click on the
--- left third goes back, elsewhere skips ahead, Esc or the x closes, and the last stays until closed.
--- A slide is { label, title, titleColor, titleSize, count, countWord, lines = { { text, color } }, bars =
--- { values, pick, left, mid, right }, rows = { { name, value, tint } }, more, npc, corner = { count, word },
--- grid = { { label, value, color } }, icon or iconAtlas (beside the label and title), roast, top, secs }: the roast, a joke, comes last. Only a slide
--- too tall for the frame (many characters) makes it grow.
 local SHOW = { width = 560, height = 330, padX = 36, padTop = 38, padBottom = 28, gap = 10, rise = 10, grow = 0.6,
     fade = 0.4, model = 210, modelHeight = 264, bars = 50, barGap = 3, roastGap = 14, icon = 72, iconGap = 16, row = 26, rowGap = 2, rowPad = 12, rowsAfter = 10, secs = 4, back = 1 / 3,
     corner = 120, cell = 34, cellGap = 12, cellGapTight = 7, colGap = 26, track = 3, trackGap = 4, titleMin = 18 }
@@ -2372,8 +2282,6 @@ local function slideCell(s, c, width)
     return p, h
 end
 
--- Lays a slide out top to bottom (centred unless d.top), each piece with the moment it rises in;
--- returns its height, whether the title was cut and whether it wrapped.
 local function placeSlide(s, d, room, titleSize, cellGap)
     for _, list in pairs(s.pool) do for _, p in ipairs(list) do p:Hide() end end
     s.n, s.items, s.ticks = {}, {}, {}
@@ -2469,8 +2377,6 @@ local function placeSlide(s, d, room, titleSize, cellGap)
     return y, cut, wrapped
 end
 
--- A long name keeps the normal frame: the grid's rows close up, then a title on more than one line
--- shrinks until the slide fits. Only a slide of many rows makes the frame grow.
 local function layoutSlide(s, d, room)
     local fit, size, gap = SHOW.height - SHOW.padTop - SHOW.padBottom, d.titleSize or 44, SHOW.cellGap
     local y, cut, wrapped = placeSlide(s, d, room, size, gap)
@@ -2485,7 +2391,6 @@ local function layoutSlide(s, d, room)
     return y
 end
 
--- Returns the frame and play(slides); store keeps where the player drags it.
 function UI.SlideShow(name, store)
     local f = CreateFrame("Frame", name, UIParent)
     f:SetSize(SHOW.width, SHOW.height)

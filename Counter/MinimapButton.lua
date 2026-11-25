@@ -1,5 +1,3 @@
--- The minimap button (LibDBIcon, which players can drag around the minimap's edge) and the entry in
--- Blizzard's addon button: the same clicks and the same tooltip.
 local addonName, ns = ...
 local UI = ns.UI
 

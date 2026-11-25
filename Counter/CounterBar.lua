@@ -1,5 +1,3 @@
--- The counter as a bar at the top of the screen, a layout in place of the box: the count, the last
--- death and time played this life in a row, the nemesis in a tab hanging under it.
 local _, ns = ...
 local UI = ns.UI
 
@@ -7,10 +5,8 @@ local HEIGHT, TAB_HEIGHT, PAD, TAB_PAD = 56, 50, 18, 20
 local SPLIT, LINE = 16, 28
 local COUNT_GAP, LABEL_GAP = 8, 4
 local LABEL = UI.LineHeight(10)
--- The longest mobs on Forever fit at full size in Cinzel 16: "Scorched Screeching Roguefeather" and
--- "Corrupted Bloodtalon Scythemaw". Longer names shrink.
 local NAME_MAX = 330
--- The game sets Cinzel higher in its line than Inter (the box drops its 48 by 5).
+-- The game sets Cinzel higher in its line than Inter.
 local CINZEL_DROP = 0.1
 -- How far above its box Cinzel 32's baseline sits. Cinzel's round digits (3, 5, 6, 9) dip about
 -- 2 px below it, the flat ones (1, 2, 4, 7) sit on it: "deaths" lines up with the flat ones.
@@ -18,7 +14,6 @@ local CINZEL_BASE = 6
 
 local frame, parts
 
--- A small label over its value ("PLAYED THIS LIFE", "23h 59m"); a name gets at most max, then a second line.
 local function column(parent, font, size, max)
     local s = { label = UI.Text(parent, "body", 10, "faint"), value = UI.Text(parent, font, size, "text"), max = max }
     if max then
@@ -29,7 +24,6 @@ local function column(parent, font, size, max)
     return s
 end
 
--- How much taller than one line a column's value is: a name on two lines.
 local function extra(s)
     if not (s.max and s.value:IsShown()) then return 0 end
     return math.max(0, math.ceil(s.value:GetStringHeight() - UI.LineHeight(s.value.style.size)))
@@ -68,7 +62,6 @@ end
 
 local function width(text) return text:GetUnboundedStringWidth() end
 
--- Measured with every digit as 0, so a ticking time doesn't move the bar's edges each second.
 local function steady(text)
     local shown = text:GetText()
     text:SetText((shown:gsub("%d", "0")))
@@ -82,12 +75,11 @@ local function put(parent, text, x, y)
     UI.Place(parent, text, x, math.floor(y + (s.font == "number" and s.size * CINZEL_DROP or 0) + 0.5))
 end
 
--- The label centred over its value.
 local function placeColumn(parent, s, x, height)
     local y = math.floor((height - LABEL - LABEL_GAP - UI.LineHeight(s.value.style.size) - extra(s)) / 2)
     local label, value = steady(s.label), s.max and math.min(width(s.value), s.max) or steady(s.value)
     if s.max then s.value:SetJustifyH(width(s.value) > s.max and "CENTER" or "LEFT") end
-    -- Blizzard's formatter drops a zero unit ("16m" at 16m 0s): a ticking time never narrows its column.
+    -- Blizzard's formatter drops a zero unit ("16m" at 16m 0s).
     local column = math.max(label, value, s.ticks and s.widest or 0)
     if s.ticks then s.widest = column end
     put(parent, s.label, x + math.floor((column - label) / 2 + 0.5), y)
@@ -119,7 +111,6 @@ local function row(x, height)
     return x
 end
 
--- The tab needs room for its joins; a bar narrower than that widens, its row centred.
 local function layout()
     local tab
     local height, tabHeight = HEIGHT + extra(parts.last), TAB_HEIGHT + (parts.hasNemesis and extra(parts.nemesis) or 0)
@@ -189,7 +180,6 @@ function refresh()
     layout()
 end
 
--- Each second only the times change.
 function tick()
     local stale, on = ns.CounterStale(frame, "bar")
     if stale then return refresh() end

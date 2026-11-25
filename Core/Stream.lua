@@ -1,10 +1,7 @@
--- At a fresh game start, asks whether to start counting a new stream when this one has deaths and
--- deaths go to Streamer.bot.
 local _, ns = ...
 local UI = ns.UI
 
--- The game says "initial login" after a logout too; a setting we register lasts until the game
--- quits, so while it's unset the game has just started.
+-- isInitialLogin is also true after a logout; a CVar we register lasts until the game quits.
 local RUNNING = "deathTrackerRunning"
 local function gameJustStarted()
     C_CVar.RegisterCVar(RUNNING, "0")
@@ -24,7 +21,6 @@ end
 
 function ns.AskResetStream() UI.Ask("Reset this stream's count to 0?", "Every death stays saved.", ns.ResetStream) end
 
--- Only the first time after the UI loads (a login or a /reload), not on every loading screen.
 ns.OnEvent("PLAYER_ENTERING_WORLD", function(isInitialLogin, isReloadingUi)
     if (isInitialLogin or isReloadingUi) and gameJustStarted() then askNewStream() end
 end)

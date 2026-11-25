@@ -1,5 +1,3 @@
--- The history window's Friends page: leaderboards (most deaths, longest life, who holds each
--- record) and Recent, what happened to friends lately. Friends are in the window's pane.
 local _, ns = ...
 local UI = ns.UI
 local Shell = ns.HistoryShell
@@ -31,31 +29,29 @@ local function value(row, kind)
     return UI.Count(row.value, "death", "deaths")
 end
 
--- Under a one-character player's name: the character, as Blizzard's friends list writes it.
 local function whoLine(row)
     if row.you then
         local c = you()
         return UI.CharacterLine(c.name, c.class, UnitLevel("player"), GetRealZoneText())
     end
-    local k = F.Known(row.id)
-    local where = not L.Online(row.id) and L.Battleground(row.id)
-    if not L.Online(row.id) and not where and not F.IsGuildOnly(row.id) then
-        return UI.Colored(("Offline, last on %s"):format(k.char or "?"), UI.FriendColor("offline"))
+    local k = F.Known(F.Current(row.id))
+    local where = not L.Online(F.Current(row.id)) and L.Battleground(row.id)
+    if not L.Online(F.Current(row.id)) and not where and not F.IsGuildOnly(row.id) then
+        return UI.Colored(("Offline, last on %s"):format(UI.CharName(k.char) or "?"), UI.FriendColor("offline"))
     end
     return UI.CharacterLine(k.tag and k.char or nil, k.class, k.level, where or F.IsGuildOnly(row.id) and UI.Join(k.zone, "guild") or k.zone)
 end
 
--- Where the player is now goes on the line of the character they play.
 local function playing(row)
     if row.you then return you().name, GetRealZoneText() end
-    local k = F.Known(row.id)
-    if L.Online(row.id) or F.IsGuildOnly(row.id) then return k.char, k.zone end
+    local k = F.Known(F.Current(row.id))
+    if L.Online(F.Current(row.id)) or F.IsGuildOnly(row.id) then return k.char, k.zone end
 end
 
 local function sinceLine(row)
     local last = row.rec.last
-    if not row.you and not L.Online(row.id) and L.Battleground(row.id) then return "in a battleground" end
-    if not row.you and not L.Online(row.id) and row.rec.got then return "count from " .. UI.Ago(row.rec.got) end
+    if not row.you and not L.Online(F.Current(row.id)) and L.Battleground(row.id) then return "in a battleground" end
+    if not row.you and not L.Online(F.Current(row.id)) and row.rec.got then return "count from " .. UI.Ago(row.rec.got) end
     return last and "last died " .. when(last.time) or "no deaths yet"
 end
 
@@ -90,7 +86,7 @@ local function target(e)
 end
 
 local HOW = { Guild = "the guild", ["Battle.net"] = "Battle.net", Friend = "your friends list" }
-local function recordsOf(e) return e.kind == "shared" and F.Shares(e.id) and F.Store().players[e.id] ~= nil end
+local function recordsOf(e) return e.kind == "shared" and F.Shares(e.id) and F.Record(e.id) ~= nil end
 
 local function opened(e)
     local sel = Shell.Selected()
@@ -127,8 +123,7 @@ local function clicks(row)
     end)
 end
 
--- Every Button row (a player in one or two lines, a character, an event) shares one build:
--- a list hands a row of one kind to another of the same frame type, so each fill sets every part.
+-- The list reuses a Button row for any kind of the same frame type, so each fill sets every part.
 local function buildRanked(row)
     UI.RankedRow(row)
     row.note = UI.GameText(row, "small", "muted")
@@ -146,7 +141,6 @@ local function clear(row, keep)
     row.tint = nil
 end
 
--- x: where the title and its second line start, after the rank or without one.
 local function indent(row, x)
     row.title:SetPoint("TOPLEFT", x, -7)
     row.line2:SetPoint("TOPLEFT", x, -23)
@@ -178,7 +172,6 @@ local function fillPlayer(row, item)
     row.tint = picked(r) and UI.COLOR.selected or nil
 end
 
--- A player with more than one character: one line; the characters follow under it.
 local function fillAccount(row, item)
     local r = item.row
     local name, color = nameOf(r)
@@ -200,11 +193,11 @@ local function playerTip(row, item)
     for _, c in ipairs(r.rec.chars) do
         lines[#lines + 1] = { UI.CharacterLine(c.name, c.class, c.level) .. UI.Muted(": ") .. UI.Count(c.deaths, "death", "deaths"), UI.COLOR.white }
     end
-    local where = not r.you and not L.Online(r.id) and L.Battleground(r.id)
+    local where = not r.you and not L.Online(F.Current(r.id)) and L.Battleground(r.id)
     if where and r.rec.got then
         lines[#lines + 1] = { ("In %s. Counts as of %s: Death Tracker can't reach anyone in a battleground, so they catch up when %s leaves."):format(
             where, UI.Ago(r.rec.got), F.Name(r.id)), UI.COLOR.muted }
-    elseif not r.you and not L.Online(r.id) and r.rec.got then
+    elseif not r.you and not L.Online(F.Current(r.id)) and r.rec.got then
         lines[#lines + 1] = { ("Counts as of %s, the last time you were both online."):format(UI.Ago(r.rec.got)), UI.COLOR.muted }
     end
     local help = "Show your records."
@@ -215,7 +208,6 @@ local function playerTip(row, item)
     UI.Tooltip(row, r.you and "You" or F.Name(r.id), nil, lines, help)
 end
 
--- A character under its player's row: indented, its own count.
 local function fillChar(row, item)
     local c = item.char
     clear(row, { charLine = true })
@@ -233,11 +225,10 @@ end
 
 local function eventLines(e)
     local name = e.id and F.Name(e.id) or ""
-    -- The third return is plain, for the side tab's note.
     local who = e.id and Shell.ColoredName(e.id) or ""
     if e.kind == "death" then
         local l = e.last
-        return who .. UI.Muted(" died to ") .. UI.KillerName(l.killer, F.Cause(l)), UI.Muted(UI.Join(l.char, l.spell, l.zone, l.number and "death #" .. l.number)),
+        return who .. UI.Muted(" died to ") .. UI.KillerName(l.killer, F.Cause(l)), UI.Muted(UI.Join(UI.CharName(l.char), l.spell, l.zone, l.number and "death #" .. l.number)),
             name .. " died to " .. l.killer
     elseif e.kind == "nemesis" then
         return who .. UI.Muted(" has a new nemesis: ") .. UI.MobName(e.nem.name or "?"),
@@ -281,10 +272,10 @@ local function eventTip(row, item)
     local sel, name, lines = target(e), F.Name(e.id), {}
     if e.kind == "nemesis" then
         local d = sameDeath(e)
-        if d and d.char then lines[#lines + 1] = UI.TipPair("Character", d.char) end
+        if d and d.char then lines[#lines + 1] = UI.TipPair("Character", UI.CharName(d.char)) end
         lines[#lines + 1] = UI.TipPair("Since", UI.AtTime(e.time))
     elseif e.kind == "respects" then
-        if sel then lines[#lines + 1] = UI.TipPair("Your death", UI.Join(sel.death.name, UI.AtTime(sel.death.time))) end
+        if sel then lines[#lines + 1] = UI.TipPair("Your death", UI.Join(UI.CharName(sel.death.name), UI.AtTime(sel.death.time))) end
         lines[#lines + 1] = UI.TipPair("Paid", UI.AtTime(e.time))
     elseif e.kind == "passed" then
         lines[#lines + 1] = UI.TipPair("Passed " .. (e.other == "you" and "you" or F.Name(e.other)), UI.AtTime(e.time))
@@ -315,9 +306,7 @@ local function eventTip(row, item)
     UI.Tooltip(row, name, Shell.FriendColor(e.id), lines, help)
 end
 
--- The Records tab: every stat the compare view has, and who among you holds it.
 local function deathsText(v) return UI.Count(v, "death", "deaths") end
--- Each record is a character's: its value, how it reads, and where and when it happened.
 local RECORD_ROWS = {
     { label = "Most deaths", period = "deaths", text = deathsText },
     { label = "Longest life", period = "longest", text = UI.Duration, death = "longestTime" },
@@ -347,8 +336,6 @@ local function recordValue(r, c, def)
     return c[def.of] or 0
 end
 
--- On this page, a group heading picked in the window's pane: only friends or only the guild. You are
--- on every board.
 local function inScope(row)
     local group = Shell.Group()
     if row.you or not group then return true end
@@ -356,8 +343,8 @@ local function inScope(row)
 end
 
 local function holderText(e)
-    if e.row.you then return UI.FriendName("You", e.char.name) end
-    return UI.FriendName(F.Known(e.row.id).tag and F.Name(e.row.id), e.char.name)
+    if e.row.you then return UI.FriendName("You", UI.CharName(e.char.name)) end
+    return UI.FriendName(F.Known(e.row.id).tag and F.Name(e.row.id), UI.CharName(e.char.name))
 end
 
 local function heldItems()
@@ -414,7 +401,6 @@ local function openRecord(item)
     Shell.Pick({ friend = top.row.id, friendChar = top.char.name }, "records")
 end
 
--- Three columns: the record, who holds it, the value against the right edge.
 local HOLDER_X = 180
 local function buildHeld(row)
     UI.StatRow(row)
@@ -453,7 +439,6 @@ local function heldLine(n, e, def)
     return ("%d. %s: %s"):format(n, holderText(e), UI.Join(def.text(e.value, e.char), where, at and UI.Date(at)))
 end
 
--- The top three, and your own best place below them when none of your characters is in them.
 local function heldTip(row, item)
     local lines, youShown = {}, false
     for n, e in ipairs(item.ranked) do
@@ -500,7 +485,6 @@ end
 local lookingUntil = 0
 local function fillShareMenu(root) A.FillMenu(root, GetTime() < lookingUntil) end
 
--- Opening it asks who has Death Tracker; it says "Looking..." until the answers are in.
 local function openShareMenu()
     lookingUntil = GetTime() + A.LOOKING
     L.Greet(true)
@@ -517,7 +501,6 @@ local function buildFooter(box)
     page.share:SetScript("OnLeave", UI.HideTooltip)
 end
 
--- A player's row, and with more than one character, each character with something to count.
 local function addPlayer(items, r, i)
     local several = #r.rec.chars > 1 and (r.you or F.Known(r.id).tag ~= nil)
     items[#items + 1] = { kind = several and "account" or "player", row = r }
@@ -565,7 +548,6 @@ local function refresh()
 end
 
 local friendsPage
--- The side tab glows while Recent holds something new and another page is open.
 local function glow()
     local tab = friendsPage.tab
     if not tab then return end

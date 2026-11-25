@@ -1,5 +1,3 @@
--- Road to 60: one character's deaths on the way to 60 as recap slides, offered once when it gets
--- there (a chat line and the popup), and from Records with that character picked.
 local _, ns = ...
 local UI, H, R = ns.UI, ns.History, ns.Recap
 
@@ -59,7 +57,7 @@ local function friendRows(m)
         end
     end
     if #rows == 0 then return nil end
-    local you = { name = UI.Colored(m.name, m.color) .. UI.Colored(" (you)", UI.COLOR.faint), value = m.deaths, tint = true }
+    local you = { name = UI.Colored(UI.CharName(m.name), m.color) .. UI.Colored(" (you)", UI.COLOR.faint), value = m.deaths, tint = true }
     rows[#rows + 1] = you
     table.sort(rows, function(a, b) return a.value > b.value end)
     local shown = {}
@@ -70,7 +68,6 @@ local function friendRows(m)
     return { rows = shown, friends = #rows - 1, below = below }
 end
 
--- at: the moment it counts to, now to test before 60.
 function R.Road(key, at)
     local c = ns.db.characters[key]
     if not c then return nil end
@@ -101,7 +98,6 @@ end
 
 local function where(d) return ("Level %d, %s."):format(d.level or 1, d.zone or "") end
 
--- "An Orc Rogue.", from what a player kill saved.
 local function whoKilled(d)
     local who = d.killerRace and d.killerClass and (d.killerRace .. " " .. d.killerClass) or d.killerClass
     if not who then return "" end
@@ -195,7 +191,6 @@ function R.RoadSlides(key, at)
     return out
 end
 
--- A link or popup can outlive the character's saved data.
 function R.PlayRoad(key, at)
     local slides = R.RoadSlides(key, at)
     if slides then return R.Show(slides) end
@@ -215,7 +210,7 @@ end
 
 UI.OnChatLink("road", function(key) R.PlayRoad(key) end)
 
--- Blizzard's count has every death; fewer saved means the addon came later, at its first saved death.
+-- Blizzard's death statistic also counts deaths from before the addon.
 local function startLevel(key)
     local saved = ns.Deaths({ char = key })
     if #saved == 0 or #saved >= ns.Statistic(TOTAL_DEATHS) then return 1 end
@@ -229,7 +224,6 @@ local function arrive(key, at)
     R.OfferRoad(key)
 end
 
--- A 60 without one (from before this version): it ends at its first saved death at 60.
 local function catchUp(key)
     local deaths, reached, before = ns.Deaths({ char = key }), time(), 0
     for i = #deaths, 1, -1 do

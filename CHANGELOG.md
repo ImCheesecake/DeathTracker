@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.7.0 (2026-11-25)
+
+A warning when a player who killed you is near, and friends with more than one WoW account.
+
+### New
+
+- **Grudge warning:** when a player who killed you, another of your characters or a friend in the last 7 days comes into view, a raid warning and a horn tell you. Turn it off with **Warn me when a player who killed me or a friend is near**.
+- **Friends:** share with a Battle.net friend once and every WoW account under their BattleTag shares too, as one row. On an account with both Horde and Alliance characters, each name shows its faction crest.
+
+### Changed
+
+- **Monthly recap:** repair bills in gold, silver and copper coins.
+
+### Fixed
+
+- **History window:** a long nemesis name wraps instead of running out, and the scrollbar no longer sits on the divider.
+
 ## 1.6.1 (2026-11-22)
 
 Fixes for the death count and for chat spam.

@@ -1,6 +1,3 @@
--- The history window: Blizzard's frame with a side tab per page (HistoryDeaths.lua, HistoryKillers.lua),
--- and what every page shares: your characters by realm ruleset and your friends on the left, the nemesis,
--- the time and Filter.
 local addonName, ns = ...
 local UI = ns.UI
 
@@ -17,8 +14,6 @@ local TIME_WIDTH = 128
 local TIMES = { { value = "stream", text = "This stream", word = "this stream" }, { value = "day", text = "Today", word = "today" },
     { value = "week", text = "This week", word = "this week" }, { value = "month", text = "This month", word = "this month" },
     { value = "all", text = "All time" } }
--- What Filter's red X brings back after a click on a killer, zone or record, by the one field the
--- click set; with more than one, the last.
 local RESETS = { { "npc", "deaths to every killer" }, { "player", "deaths to every killer" }, { "spot", "deaths at every spot" },
     { "zone", "deaths in every zone" }, { "day", "deaths on every day" }, { "from", "deaths in every stream" },
     { "death", "every death" } }
@@ -27,7 +22,6 @@ local Shell = { pages = {} }
 ns.HistoryShell = Shell
 
 local frame, page, state, current
--- The filter fields a click on a killer, zone or record adds (Shell.Focus).
 local FOCUS = { "npc", "player", "zone", "spot", "day", "death", "from", "to" }
 
 function Shell.AddPage(p) table.insert(Shell.pages, p) end
@@ -57,10 +51,8 @@ local function shellDefault()
     return allOn(state.causes, causeKeys()) and not state.minLevel and not state.maxLevel and not state.focus
 end
 
--- Streams are yours alone: a friend picked has none.
 local function hasStreams() return ns.Streaming() and not (current and current.noStream) and not state.friend end
 
--- The pick, else this stream with Streamer.bot on; a page without streams shows All time.
 local function timePick()
     local t = state.time or (ns.Streaming() and "stream" or "all")
     if t == "stream" and not hasStreams() then return "all" end
@@ -77,7 +69,6 @@ local function timeOf(value)
     for _, t in ipairs(TIMES) do if t.value == value then return t end end
 end
 
--- Today, this week or this month for the Friends page, which has no streams.
 function Shell.Period()
     local t = timePick()
     return t == "stream" and "all" or t
@@ -127,31 +118,25 @@ function Shell.PickedChar(key)
     if only and not next(ns.db.characters, only) then return only end
 end
 
--- Every cause and level: nothing in Filter narrows the deaths.
 Shell.NoFilter = shellDefault
 
 function Shell.YourKey(name)
     for key, c in pairs(ns.db.characters) do if c.name == name then return key end end
 end
 
--- The friend picked in the pane (an id), and one of their characters (a name) when one is picked.
 function Shell.Friend() return state.friend, state.friendChar end
 
--- The friend picked, by the character picked or else their name.
 function Shell.FriendName() return state.friendChar or ns.Friends.Name(state.friend) end
 
 function Shell.Whom() return state.friend and Shell.FriendName() or "you" end
 function Shell.Whose() return state.friend and "their" or "your" end
 
--- On the Friends page, a group heading picked in the pane: "friends" or "guild".
 function Shell.Group() return state.group end
 
 local refresh, showDetails
 
--- Picks in the pane as a click there would: pick.friend (an id) and pick.friendChar (a name), or
--- pick.char (one of your character keys), or neither for all of yours. page: a page key to open on it.
 function Shell.Pick(pick, page)
-    state.friend, state.friendChar, state.char, state.ruleset = pick.friend, pick.friendChar, pick.char, nil
+    state.friend, state.friendChar, state.char, state.ruleset = pick.friend and ns.Friends.Primary(pick.friend), pick.friendChar, pick.char, nil
     if not pick.friend then state.compare = nil end
     if page then return Shell.Show(page) end
     refresh()
@@ -164,15 +149,13 @@ function Shell.SetComparing(on)
     refresh()
 end
 
--- Blizzard's friends-list colors: a Battle.net friend, one on the friends list, offline. A guildmate
--- who is neither shows in their character's class color.
 function Shell.FriendColor(id)
     local F, L = ns.Friends, ns.FriendsLink
     if F.IsGuildOnly(id) then
-        local rec = F.Store().players[id]
+        local rec = F.Record(id)
         return UI.ClassColor(rec and rec.chars[1] and rec.chars[1].class) or UI.FriendColor("character")
     end
-    if not L.Online(id) and not L.Battleground(id) then return UI.FriendColor("offline") end
+    if not L.Online(F.Current(id)) and not L.Battleground(id) then return UI.FriendColor("offline") end
     return UI.FriendColor(F.Known(id).tag and "bnet" or "character")
 end
 
@@ -180,7 +163,7 @@ function Shell.ColoredName(id) return UI.Colored(ns.Friends.Name(id), Shell.Frie
 
 function Shell.CharacterLine(d)
     local ruleset = ns.Ruleset(d.char)
-    return ruleset and ("%s, %s realm"):format(d.name, ruleset) or d.name
+    return ruleset and ("%s, %s realm"):format(UI.CharName(d.name), ruleset) or UI.CharName(d.name)
 end
 
 local function showing()
@@ -188,15 +171,15 @@ local function showing()
     if state.friend then
         local who = Shell.ColoredName(state.friend)
         if state.friendChar then
-            local c = ns.Friends.Char(ns.Friends.Store().players[state.friend], state.friendChar)
-            who = who .. "'s " .. UI.Colored(state.friendChar, UI.ClassColor(c and c.class) or UI.COLOR.text)
+            local c = ns.Friends.Char(ns.Friends.Record(state.friend), state.friendChar)
+            who = who .. "'s " .. UI.Colored(UI.CharName(state.friendChar), UI.ClassColor(c and c.class) or UI.COLOR.text)
         end
         local own = current.FriendShowing and current.FriendShowing(who)
         if own then return own end
         parts[1] = who
     elseif state.char then
         local c = ns.db.characters[state.char]
-        parts[#parts + 1] = UI.Colored(c.name, UI.ClassColor(c.class) or UI.COLOR.text)
+        parts[#parts + 1] = UI.Colored(UI.CharName(c.name), UI.ClassColor(c.class) or UI.COLOR.text)
     elseif state.ruleset then
         parts[#parts + 1] = state.ruleset .. " characters"
     end
@@ -208,7 +191,6 @@ local function showing()
             local side = state.causes[c[1]] and on or off
             side[#side + 1] = CAUSE_WORDS[c[1]]
         end
-        -- The shorter side: the causes left, or every death but the ones taken off.
         if #off < #on then
             parts[#parts + 1] = ("%s but %s"):format(current.every, UI.AndList(off))
         elseif #on > 0 then
@@ -287,7 +269,6 @@ local function buildCharacter(row)
     end, function(self) return self.item.friend ~= nil and not ns.Friends.IsGuildOnly(self.item.friend) end)
 end
 
--- A heading to click: a realm (your characters there), or on the Friends page a group of friends.
 local function buildRealm(row)
     UI.PaneHeading(row)
     row:SetScript("OnClick", function(self)
@@ -313,7 +294,13 @@ local function realmTip(row, item)
 end
 
 local function fillCharacter(row, item)
-    UI.FillPaneRow(row, item.name, item.color, item.level, item.deaths, item.selected, item.indent)
+    UI.FillPaneRow(row, item.name, item.color, item.level, item.deaths, item.selected, item.indent, item.faction)
+end
+
+local function bothFactions(chars)
+    local seen = {}
+    for _, c in pairs(chars) do if c.faction then seen[c.faction] = true end end
+    return seen.Horde and seen.Alliance or false
 end
 
 local function characterTip(row, item)
@@ -323,12 +310,12 @@ local function characterTip(row, item)
     end
     if item.friend then
         local names = {}
-        for _, c in ipairs(item.chars) do names[#names + 1] = c.name .. " " .. c.level end
+        for _, c in ipairs(item.chars) do names[#names + 1] = UI.CharName(c.name) .. " " .. c.level end
         local help = (onFriends and "Show %s's records." or #item.chars > 1 and "Show %s's deaths on every character."
             or "Show %s's deaths."):format(item.name)
         if not ns.Friends.IsGuildOnly(item.friend) then help = help .. "\nRight-click to stop sharing." end
         local lines = { UI.TipPair("Characters", table.concat(names, ", ")) }
-        local where = not ns.FriendsLink.Online(item.friend) and ns.FriendsLink.Battleground(item.friend)
+        local where = not ns.FriendsLink.Online(ns.Friends.Current(item.friend)) and ns.FriendsLink.Battleground(item.friend)
         if where then
             lines[2] = ("In %s. Death Tracker can't reach anyone in a battleground, so their deaths there show up when they leave."):format(where)
         end
@@ -340,12 +327,12 @@ end
 local function characterItems()
     local f = menuFilter()
     f.ruleset = nil
-    local byRuleset, total = {}, 0
+    local byRuleset, total, mixed = {}, 0, bothFactions(ns.db.characters)
     for key, c in pairs(ns.db.characters) do
         local r = ns.Ruleset(key) or "Other"
         f.char = key
         byRuleset[r] = byRuleset[r] or {}
-        table.insert(byRuleset[r], { kind = "character", key = key, name = c.name, level = c.level,
+        table.insert(byRuleset[r], { kind = "character", key = key, name = c.name, level = c.level, faction = mixed and c.faction or nil,
             color = UI.ClassColor(c.class), deaths = #ns.Deaths(f), selected = not state.friend and state.char == key })
         total = total + 1
     end
@@ -374,11 +361,8 @@ local function characterItems()
     return items
 end
 
--- On the Friends page, while guild sharing is off and guildmates use Death Tracker: where to turn it on.
 local function guildHint() return current.key == "friends" and ns.FriendsAsk.GuildHint() or nil end
 
--- Under your characters: friends, then guildmates. A friend's characters open under their name once
--- picked, when there are two or more. On the Friends page, with both groups, their headings pick one.
 local function friendItems(items)
     local F = ns.Friends
     local groups = { { group = "friends", text = "Friends", rows = {} }, { group = "guild", text = "Guild", rows = {} } }
@@ -400,8 +384,10 @@ local function friendItems(items)
                     level = F.IsGuildOnly(id) and rec.chars[1] and rec.chars[1].level or nil, deaths = F.Value(rec, "deaths", period),
                     selected = state.friend == id and not (several and state.friendChar) }
                 if several and state.friend == id then
+                    local mixed = bothFactions(rec.chars)
                     for _, c in ipairs(rec.chars) do
                         items[#items + 1] = { kind = "character", friend = id, friendChar = c.name, name = c.name, indent = true,
+                            faction = mixed and c.faction or nil,
                             color = UI.ClassColor(c.class), level = c.level, deaths = F.Value(rec, "deaths", period, c),
                             selected = state.friendChar == c.name }
                     end
@@ -436,7 +422,7 @@ local function nemesisLines(f)
 end
 
 local function friendNemesis()
-    local rec = ns.Friends.Store().players[state.friend]
+    local rec = ns.Friends.Record(state.friend)
     local name, kills
     if state.friendChar then
         local c = ns.Friends.Char(rec, state.friendChar)
@@ -473,12 +459,15 @@ local function buildShell()
         -- Its own frame type: a list reuses a frame for any kind of the same type.
         realm = { template = "CheckButton", extent = 24, build = buildRealm, fill = UI.FillPaneHeading, tip = realmTip } }, 2)
     page.characters.box:SetPoint("TOPLEFT", 8, -12)
-    page.characters.box:SetWidth(PANE - 16)
+    page.characters.Fit(PANE - 16)
     page.nemesisLine = UI.Divider(page.pane)
     page.nemesisLabel = UI.GameText(page.pane, "small", "faint")
     page.nemesisLabel:SetText("Nemesis")
     page.nemesisName = UI.GameText(page.pane, "normal", "text")
     page.nemesisName:SetPoint("TOPLEFT", page.nemesisLabel, "BOTTOMLEFT", 0, -3)
+    page.nemesisName:SetWidth(PANE - 32)
+    page.nemesisName:SetJustifyH("LEFT")
+    page.nemesisName:SetWordWrap(true)
     page.nemesisNote = UI.GameText(page.pane, "small", "muted")
     page.nemesisNote:SetPoint("TOPLEFT", page.nemesisName, "BOTTOMLEFT", 0, -3)
     page.nemesisNote:SetWidth(PANE - 32)
@@ -525,7 +514,6 @@ local function buildShell()
     page.emptyNote:SetPoint("TOP", page.right, "CENTER", 0, -4)
 end
 
--- A page with a pane of its own (Trophies) hides the characters and the nemesis.
 local function ownPane()
     for _, p in ipairs(Shell.pages) do
         local parts = frame.pages[p.key]
@@ -556,7 +544,9 @@ local function refreshPane()
     page.guildNote:SetShown(hint ~= nil)
     page.guildLink:SetShown(hint ~= nil)
     local hintHeight = hint and page.guildNote:GetStringHeight() + 4 + page.guildLink:GetHeight() + 8 or 0
-    local room = HEIGHT - TOP - 16 - 12 - (name and NEMESIS_HEIGHT or 0) - (current.BuildFooter and FOOTER or 0) - hintHeight
+    page.nemesisName:SetText(name or "")
+    local wrapped = name and math.max(0, page.nemesisName:GetStringHeight() - UI.LineHeight((select(2, page.nemesisName:GetFont())))) or 0
+    local room = HEIGHT - TOP - 16 - 12 - (name and NEMESIS_HEIGHT + wrapped or 0) - (current.BuildFooter and FOOTER or 0) - hintHeight
     local height = math.min(page.characters.Height(items), room)
     page.characters.box:SetHeight(height)
     if hint then UI.Place(page.pane, page.guildNote, 16, 12 + height + 2) end
@@ -565,7 +555,6 @@ local function refreshPane()
     UI.Place(page.pane, page.nemesisLine, 16, 12 + height + 16)
     page.nemesisLine:SetWidth(PANE - 32)
     UI.Place(page.pane, page.nemesisLabel, 16, 12 + height + 28)
-    page.nemesisName:SetText(name)
     UI.Tint(page.nemesisName, name == NO_NEMESIS and UI.COLOR.text or UI.CauseColor("mob"))
     page.nemesisNote:SetText(note)
 end
@@ -577,7 +566,7 @@ function refresh()
         for key in pairs(ns.db.characters) do any = any or ns.Ruleset(key) == state.ruleset end
         if not any then state.ruleset = nil end
     end
-    local friendRec = state.friend and ns.Friends.Shares(state.friend) and ns.Friends.Store().players[state.friend]
+    local friendRec = state.friend and ns.Friends.Shares(state.friend) and ns.Friends.Record(state.friend)
     if not friendRec then state.friend, state.friendChar, state.compare = nil, nil, nil end
     if state.friendChar and not ns.Friends.Char(friendRec, state.friendChar) then state.friendChar = nil end
     if state.friend then ns.FriendsLink.WantDeaths(state.friend) end
@@ -588,8 +577,6 @@ function refresh()
     page.showing:SetText(current.Showing and current.Showing() or showing())
     refreshPane()
     local any = current.Refresh(ns.Deaths(Shell.Filter()))
-    -- A page without time or Filter (Trophies) starts its line where the time would be; a page's own
-    -- button beside Filter (Records' Play recap) pushes it along.
     local beside = frame.pages[current.key].beside
     if current.noTime then
         page.showing:SetPoint("LEFT", page.time, "LEFT")
@@ -620,8 +607,6 @@ function refresh()
 end
 Shell.Refresh = function() refresh() end
 
--- The details on the right: what a click on a row picked (sel), filled by the page's Details(panel,
--- sel), which returns false once sel is gone (a filter took it off). The window grows to the right.
 function showDetails()
     local sel = state.details
     local open = sel ~= nil and current.Details ~= nil
@@ -645,18 +630,15 @@ end
 
 function Shell.Selected() return state.details end
 
--- sel: { kind = "death", death = d } or what the page's Details reads; a click on the open one closes it.
 function Shell.ShowDetails(sel, same)
     if state.details and same and same(state.details) then state.details = nil else state.details = sel end
     refresh()
 end
 
--- A death in a details list: who died and when; a click opens it on the Deaths page. whose: { of = a
--- friend's id } or { mine = true } when the panel isn't about whoever the pane has picked.
 function Shell.DeathPick(panel, d, whose)
     local of = whose and whose.of or not whose and state.friend
-    local c = of and ns.Friends.Char(ns.Friends.Store().players[of], d.name) or ns.db.characters[d.char]
-    local who = d.name .. (d.level and " " .. UI.Colored(d.level, UI.COLOR.faint) or "")
+    local c = of and ns.Friends.Char(ns.Friends.Record(of), d.name) or ns.db.characters[d.char]
+    local who = UI.CharName(d.name) .. (d.level and " " .. UI.Colored(d.level, UI.COLOR.faint) or "")
     panel:Pick(who, c and UI.ClassColor(c.class) or UI.COLOR.text, UI.At(d.time, true),
         function() Shell.Focus({ death = d, of = whose and whose.of, mine = whose and whose.mine }) end,
         "Show this death", "Opens it on the Deaths page.")
@@ -679,22 +661,17 @@ local function showPage(p)
     for _, other in ipairs(Shell.pages) do if other.Shown then other.Shown(other == p) end end
 end
 
--- focus: filter fields from FOCUS, and text for the filter line ("deaths to Rocklance").
--- A focus on one death (a record, a trophy) opens it on the Deaths page instead of a list of one.
--- focus.of (a friend's id) or focus.mine picks whose deaths first.
 function Shell.Focus(focus)
-    if focus and (focus.of or focus.mine) then state.friend, state.friendChar, state.compare = focus.of, nil, nil end
+    if focus and (focus.of or focus.mine) then state.friend, state.friendChar, state.compare = focus.of and ns.Friends.Primary(focus.of), nil, nil end
     local one = focus and focus.death
     for _, k in ipairs(FOCUS) do if k ~= "death" and focus and focus[k] ~= nil then one = nil end end
     state.focus = not one and focus or nil
     if one then
-        -- Whose death it is picks whose list: a friend's own, else yours.
         local theirs = false
         for _, d in ipairs(state.friend and ns.Friends.Log(state.friend) or {}) do theirs = theirs or d == one end
         if not theirs then state.friend, state.friendChar, state.compare = nil, nil, nil end
         local listed = false
         for _, d in ipairs(ns.Deaths(Shell.Filter())) do listed = listed or d == one end
-        -- The death opened is on the list, picked: the filters that hide it come off.
         if not listed then
             resetFilter()
             state.time, state.char, state.ruleset, state.friendChar = "all", nil, nil, nil
@@ -749,15 +726,15 @@ SLASH_DEATHTRACKER2 = "/deaths"
 SlashCmdList.DEATHTRACKER = function(msg)
     local command, rest = (msg or ""):match("^(%S*)%s*(.-)%s*$")
     if command == "poster" then return ns.PreviewPoster(rest) end
-    -- FriendsDemo.lua never ships, so players get the Friends page.
+    -- Testing/ never ships, so players get the Friends page and no recap demo.
     if command == "friends" then
         if ns.FriendsDemo then return ns.FriendsDemo(rest) end
         return Shell.Show("friends")
     end
     if command == "trophy" then return ns.PreviewTrophy(rest) end
     if command == "card" then return ns.PreviewCard(rest) end
-    -- RecapDemo.lua never ships either.
     if command == "recap" and ns.RecapDemo then return ns.RecapDemo(rest) end
     if command == "road" and ns.RoadDemo then return ns.RoadDemo() end
+    if command == "grudge" and ns.GrudgeDemo then return ns.GrudgeDemo() end
     ns.ToggleHistory()
 end

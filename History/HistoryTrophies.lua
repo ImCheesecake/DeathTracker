@@ -1,5 +1,3 @@
--- The history window's Trophies page (board "Trophies page"), in Blizzard's achievement look: the
--- groups as Blizzard's category tabs, each trophy a card, Summary first. /trophies opens it.
 local _, ns = ...
 local UI, T = ns.UI, ns.Trophies
 local Shell = ns.HistoryShell
@@ -23,7 +21,7 @@ end
 
 local function charName(key)
     local c = ns.db.characters[key]
-    return c and c.name or key
+    return c and UI.CharName(c.name) or key
 end
 
 local function mobName(npc)
@@ -31,7 +29,6 @@ local function mobName(npc)
     return ns.db.npcNames[npc] or (d and d.killer) or "?"
 end
 
--- Its parts, or a ladder's steps, as Blizzard's criteria cells: { text, done }.
 local function cellsOf(def)
     local out = {}
     if def.parts then
@@ -44,7 +41,6 @@ local function cellsOf(def)
     return out
 end
 
--- The step a card stands for: a step earned (Earned lately), the last one once all are, else the next.
 local function tierOf(item)
     if item.tier then return item.tier, true end
     local got = #steps(item.def)
@@ -58,7 +54,6 @@ local function progressOf(def, goal)
     return { math.min(n, goal), goal, def.show and def.show(n, goal) or nil }
 end
 
--- A click on an earned trophy shows the death (or the mob) that earned it.
 local function focusOf(def, tier)
     local step = steps(def)[tier]
     if not step then return nil end
@@ -116,7 +111,6 @@ local function cardHeight(item)
     return UI.CARD + CARD_GAP
 end
 
--- A line between cards: a heading, a group's progress bar, or the hidden ones.
 local TEXT_HEIGHT = { heading = 30, hidden = 24 }
 local function buildText(row)
     row.title = UI.GameText(row, "normal", "text")
@@ -152,7 +146,6 @@ local function summaryItems()
     table.sort(recent, function(a, b) return a.time > b.time end)
     if #recent == 0 then items[#items + 1] = { kind = "text", style = "hidden", title = "Your first death earns First of Many." } end
     for i = 1, math.min(SUMMARY_CARDS, #recent) do items[#items + 1] = { kind = "card", def = recent[i].def, tier = recent[i].tier } end
-    -- The groups' progress is in the top bar and the pane; Summary shows the closest instead.
     local close = {}
     for i, def in ipairs(T.defs) do
         if T.Shown(def) and not complete(def) then
@@ -169,7 +162,6 @@ local function summaryItems()
     return items
 end
 
--- Earned first, newest first; then the rest, the closest first; the hidden ones last.
 local function cardsOf(items, group, sub)
     local earned, todo, hidden = {}, {}, 0
     for i, def in ipairs(T.defs) do
@@ -199,7 +191,6 @@ local function cardsOf(items, group, sub)
     end
 end
 
--- A group with subgroups shows them all, a heading over each; a subgroup picked shows its own.
 local function groupItems()
     local items, subs = {}, T.SUBGROUPS[P.group]
     if not subs or P.sub then
@@ -213,9 +204,8 @@ local function groupItems()
     return items
 end
 
--- The window's top bar, where the death pages have their time and Filter: the progress of what's
--- shown, and your points. Made the first time the page shows (the window exists by then); it lives
--- in the page's content, so it shows only with the page.
+-- Anchored to the window, which exists only once the page first shows, but parented to the page's
+-- content so it hides with the page.
 local function topBar()
     local top = page.top
     if not top then
@@ -226,7 +216,6 @@ local function topBar()
         top.name = UI.GameText(top, "normal", "white")
         top.name:SetPoint("LEFT")
         UI.Tint(top.name, UI.LabelColor())
-        -- The cards' bar, in Blizzard's achievement bar frame.
         top.bar = UI.ProgressBar(top, 240, 18)
         top.bar:SetPoint("LEFT", top.name, "RIGHT", 14, 0)
         top.points = UI.Text(top, "number", 19, "text")
@@ -255,7 +244,6 @@ local function refreshTrophies()
     return true
 end
 
--- A click on a group opens it (and closes the one open); a click on a subgroup shows only its trophies.
 local function buildGroup(row)
     UI.TabRow(row)
     row:SetScript("OnClick", function(self)
@@ -301,7 +289,6 @@ end
 
 local trophiesPage = { key = "trophies", title = "Trophies", icon = CUP,
     tip = function() return ("What your deaths have earned you: %d of %d."):format(T.Counts()) end,
-    -- The window's time and Filter are about deaths; a trophy is earned once, for good.
     noTime = true, noFilter = true, noStream = true,
     Showing = function() return "" end,
     empty = { "", "", "", "" },

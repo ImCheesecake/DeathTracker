@@ -1,10 +1,6 @@
--- The recaps' roasts (the month, Road to 60): one line at the end of each slide, picked from what the month's numbers
--- say, then at random each time the recap plays.
 local _, ns = ...
 local R = ns.Recap
 
--- Each pool lists { line, when }: a line joins only when its when(facts) is true, or always without one.
--- Filled in from facts: {name} (a first name), {full}, {deaths}, {killer}, {kills}, {level}, {zone}.
 local ROASTS = {
     start = {
         { "Spoiler: not well.", function(f) return f.deaths >= 10 end },
@@ -77,7 +73,6 @@ local ROASTS = {
 }
 R.ROASTS = ROASTS
 
--- Every line of the pool that fits these facts, filled in.
 function R.RoastChoices(pool, facts)
     local out = {}
     for _, entry in ipairs(ROASTS[pool]) do

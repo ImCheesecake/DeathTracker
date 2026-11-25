@@ -1,5 +1,3 @@
--- Friends' death counts: your own record, the ones friends sent, the leaderboard and the Recent list.
--- No frames and no sending here (FriendsLink.lua sends, the Friends page and popups draw).
 local _, ns = ...
 local F = {}
 ns.Friends = F
@@ -7,11 +5,10 @@ ns.Friends = F
 F.RECENT = 50
 F.KILLERS = 8
 F.ZONES = 8
-F.SENT_DEATHS = 10    -- a record carries this many of the newest deaths, for Recent after time away
-F.FORMAT = 7         -- what a record holds; a later format only adds fields at the end of each list; 7 sends deaths
+F.SENT_DEATHS = 10
+F.FORMAT = 7
 F.ALL_KILLERS = 12
 
--- friendDeath: "off", "small" or "card". friendsGuild: the guild switch; friendsGuildAsked: its one chat line shown, or the switch used.
 ns.DEFAULTS.friendDeath = "small"
 ns.DEFAULTS.friendSound = true
 ns.DEFAULTS.friendsGuild = false
@@ -29,7 +26,6 @@ local function store()
 end
 F.Store = store
 
--- Fake friends for testing in game (/deathtracker friends demo): held in memory, never saved.
 function F.Demo(fake)
     demo = fake and { players = {}, shared = {}, known = {}, refused = {}, recent = {}, version = 0, me = F.Me() } or nil
     return demo
@@ -37,16 +33,14 @@ end
 
 function F.IsDemo() return demo ~= nil end
 
--- Picked the first time it's needed, so nothing else's random numbers move before then.
 function F.Me()
     local s = store()
     if not s.me then s.me = ("%08x"):format(math.random(0, 0x7fffffff)) end
     return s.me
 end
 
--- Message fields can't hold the separators.
 local function clean(v) return v == nil and "" or (tostring(v):gsub("[%^~,]", "")) end
--- Text that keeps every character: the separators travel as %XX.
+F.Clean = clean
 local function esc(v) return (tostring(v):gsub("[%%,;@%^~]", function(c) return ("%%%02X"):format(c:byte()) end)) end
 local function unesc(v) return (v:gsub("%%(%x%x)", function(h) return string.char(tonumber(h, 16)) end)) end
 local function num(v) return tonumber(v) or 0 end
@@ -60,8 +54,6 @@ local function periods(t)
     return out
 end
 
--- What the details panel shows of a death, in one field: "most;damage;deadIn;attackers;killer;hit;hit",
--- the killer "level@race@class@rank", each hit the panel lists "spell@id@amount@overkill@hp@before@source@npc@crit@melee@env".
 local function hitText(v) return (clean(v):gsub("[;@]", "")) end
 local function decimal(v, places) return v and ("%." .. places .. "f"):format(v) or "" end
 
@@ -78,7 +70,6 @@ local function fightOf(d)
     return table.concat(out, ";")
 end
 
--- Which death it is, as your record numbers them for friends: every character, battlegrounds apart.
 function F.DeathNumber(d)
     local n = 0
     for _, x in ipairs(ns.db.deaths) do
@@ -93,15 +84,13 @@ local function lastDeath(d, total)
         level = d.level, number = total, spell = spell, cause = d.cause, fight = fightOf(d), joke = d.joke }
 end
 
--- What killed a friend. Older versions send no cause; a mob always has an npc id and a player never
--- does (Classify.lua), and only those two have a spell.
+-- Older versions send no cause: a mob always has an npc id, a player never does, and only those two have a spell.
 function F.Cause(l) return l.cause or (l.npc and "mob") or (l.spell and "player") or "unknown" end
 
--- Everything one player shares, from their own saved deaths.
 local function gather()
     local chars, killers, killerNames, levels = {}, {}, {}, 0
     for key, c in pairs(ns.db.characters) do
-        chars[key] = { name = c.name, class = c.class, level = c.level or 1, deaths = 0, longest = 0, pDeaths = {}, pLongest = {},
+        chars[key] = { name = c.name, class = c.class, faction = c.faction, level = c.level or 1, deaths = 0, longest = 0, pDeaths = {}, pLongest = {},
             repair = 0, ran = 0, ghost = 0, hit = 0, bg = 0, dungeon = 0, pBg = {}, pDungeon = {} }
     end
     local starts = {}
@@ -109,8 +98,6 @@ local function gather()
     local function countIn(t, d)
         for p, from in pairs(starts) do if d.time >= from then t[p] = (t[p] or 0) + 1 end end
     end
-    -- Battlegrounds and arenas count apart, so a player who lives in them doesn't swamp the rest.
-    -- Dungeons and raids count in the deaths, and apart too (only those saved with d.instance).
     local deaths, bg, dungeon, pBg, pDungeon, zoneDeaths = {}, 0, 0, {}, {}, {}
     local all = {}
     for _, d in ipairs(ns.db.deaths) do
@@ -184,7 +171,7 @@ local function gather()
     end
     table.sort(list, function(a, b) return a.name < b.name end)
     local top = {}
-    -- A mob's tooltip name can't always be read (in a dungeon): then the name its death saved.
+    -- A mob's tooltip name can't always be read in a dungeon.
     for npc, kills in pairs(killers) do
         top[#top + 1] = { npc = npc, kills = kills, name = ns.db.npcNames[npc] or killerNames[npc] }
     end
@@ -238,7 +225,6 @@ local function gather()
         local npc, name, kills = ns.Nemesis({ char = d.char })
         if npc then rec.nem = { npc = npc, name = name, kills = kills } end
     end
-    -- The deaths the records name, for their details on a friend's screen; the newest are there already.
     local sent, number = {}, {}
     for _, e in ipairs(rec.earlier) do sent[e.time .. e.char] = true end
     if rec.last then sent[rec.last.time .. rec.last.char] = true end
@@ -256,7 +242,6 @@ local function gather()
     return rec
 end
 
--- One death in a list of the record: the newest before the last, or one a record names.
 local function deathText(e)
     return table.concat({ clean(e.killer), e.npc or "", clean(e.zone), e.time or "", clean(e.char), e.level or "",
         e.number or "", clean(e.spell), clean(e.cause), e.fight or "", e.joke and esc(e.joke) or "" }, ",")
@@ -272,7 +257,7 @@ local function body(rec)
             c.hitTime or "", clean(c.ranZone), c.ranTime or "", c.dungeon or 0, table.concat(periods(c.pDungeon or {}), "/"),
             table.concat(periods(c.pBg or {}), "/"), c.runSecs or "", clean(c.longestWhat), clean(c.longestZone),
             c.longestTime or "", c.costly or 0, clean(c.costlyWhat), c.costlyTime or "", c.ghostMost or 0, clean(c.ghostZone),
-            c.ghostTime or "", clean(c.hitZone) }, ",")
+            c.ghostTime or "", clean(c.hitZone), clean(c.faction) }, ",")
     end
     for _, k in ipairs(rec.killers) do killers[#killers + 1] = table.concat({ k.npc, k.kills, clean(k.name) }, ",") end
     local all = {}
@@ -297,7 +282,6 @@ local function body(rec)
         table.concat(earlier, "~"), clean(l.cause), table.concat(zones, "~"), l.fight or "", table.concat(records, "~"), l.joke and esc(l.joke) or "" }, "^")
 end
 
--- Your record; its version goes up whenever what it says changes (a death, a deleted death, a level).
 function F.Mine()
     local s, rec = store(), gather()
     local said = body(rec)
@@ -306,7 +290,6 @@ function F.Mine()
     return rec, rec.id .. "^" .. rec.v .. "^" .. body(rec)
 end
 
--- sep is one plain character.
 local function split(text, sep)
     local out = {}
     for part in (text .. sep):gmatch("(.-)%" .. sep) do out[#out + 1] = part end
@@ -346,8 +329,7 @@ end
 
 function F.Parse(text)
     local p = split(text, "^")
-    -- Fields only ever get added at the end: a record from a later version reads as far as this one
-    -- knows, one from an earlier version reads what it has (29: the first test builds).
+    -- 29: the first format's field count; later formats only add fields at the end.
     if #p < 29 or not tonumber(p[2]) then return nil end
     local rec = { id = p[1], v = num(p[2]), deaths = num(p[3]), levels = num(p[4]), longest = tonumber(p[5]),
         longestChar = opt(p[6]), longestAt = tonumber(p[7]), dayMost = tonumber(p[8]), dayMostDay = opt(p[9]),
@@ -395,7 +377,7 @@ function F.Parse(text)
             ranTime = tonumber(f[24]), dungeon = num(f[25]), pDungeon = {}, pBg = {}, runSecs = tonumber(f[28]),
             longestWhat = opt(f[29]), longestZone = opt(f[30]), longestTime = tonumber(f[31]), costly = num(f[32]),
             costlyWhat = opt(f[33]), costlyTime = tonumber(f[34]), ghostMost = num(f[35]), ghostZone = opt(f[36]),
-            ghostTime = tonumber(f[37]), hitZone = opt(f[38]) }
+            ghostTime = tonumber(f[37]), hitZone = opt(f[38]), faction = opt(f[39]) }
         local cdg, cbg = split(f[26] or "", "/"), split(f[27] or "", "/")
         for i, period in ipairs(F.PERIODS) do ch.pDungeon[period], ch.pBg[period] = num(cdg[i]), num(cbg[i]) end
         if tonumber(f[19]) then ch.last = { killer = f[17], zone = opt(f[18]), time = tonumber(f[19]) } end
@@ -411,42 +393,112 @@ function F.Parse(text)
     return rec
 end
 
--- What you know of a player beyond their record: who they are now and where.
 function F.Known(id)
     local s = store()
     s.known[id] = s.known[id] or {}
     return s.known[id]
 end
 
+function F.InGroup(id)
+    local char = F.Known(id).char
+    return char ~= nil and (UnitInParty(char) or UnitInRaid(char)) and true or false
+end
+
+local noAccount = {}
+function F.Account(id)
+    local k = store().known[id]
+    if not (k and k.tag) then return nil end
+    if not k.account and not noAccount[id] and ns.FriendsLink then
+        k.account = ns.FriendsLink.AccountByTag(k.tag)
+        noAccount[id] = k.account == nil
+    end
+    return k.account
+end
+
+function F.SharesAccount(account)
+    local s = store()
+    if not account or (s.stopped and s.stopped[account]) then return false end
+    for id in pairs(s.shared) do
+        if F.Account(id) == account then return true end
+    end
+    return false
+end
+
 function F.Shares(id)
     local s = store()
     if s.shared[id] then return true end
     local k = s.known[id]
+    if F.SharesAccount(F.Account(id)) then return true end
     if demo then return k ~= nil and k.guild ~= nil end
     return ns.db.settings.friendsGuild == true and k ~= nil and k.guild ~= nil and k.guild == F.GuildName()
 end
 
 function F.GuildName() return IsInGuild() and GetGuildInfo("player") or nil end
 
-function F.Share(id) store().shared[id] = true end
+function F.Share(id)
+    local s, account = store(), F.Account(id)
+    s.shared[id] = true
+    if account and s.stopped then s.stopped[account] = nil end
+end
 
 local unshared = {}
 function F.OnUnshare(fn) unshared[#unshared + 1] = fn end
 
+local function sameAccount(id)
+    local account, out = F.Account(id), { id }
+    if not account then return out, nil end
+    for other in pairs(store().known) do
+        if other ~= id and F.Account(other) == account then out[#out + 1] = other end
+    end
+    return out, account
+end
+F.SameAccount = sameAccount
+
 function F.Unshare(id)
     local s = store()
-    s.shared[id], s.players[id] = nil, nil
-    for _, fn in ipairs(unshared) do fn(id) end
+    local ids, account = sameAccount(id)
+    if account then
+        s.stopped = s.stopped or {}
+        s.stopped[account] = true
+    end
+    for _, x in ipairs(ids) do
+        s.shared[x], s.players[x] = nil, nil
+        for _, fn in ipairs(unshared) do fn(x) end
+    end
 end
 
--- A friend's display name: their BattleTag without the numbers, else the character they play now.
+-- One Battle.net account can hold several WoW accounts, each with its own saved file and id.
+function F.Ids(id)
+    local s, out = store(), {}
+    local account = F.Account(id)
+    if account then
+        for other in pairs(s.players) do
+            if F.Account(other) == account and F.Shares(other) then out[#out + 1] = other end
+        end
+    end
+    if #out == 0 then return { id } end
+    table.sort(out)
+    return out
+end
+
+function F.Primary(id) return F.Ids(id)[1] end
+
+function F.Current(person)
+    local ids = F.Ids(person)
+    local best, seen = ids[1], -1
+    for _, id in ipairs(ids) do
+        if ns.FriendsLink.Online(id) then return id end
+        local k = store().known[id]
+        if k and (k.seen or 0) > seen then best, seen = id, k.seen or 0 end
+    end
+    return best
+end
+
 function F.Name(id)
     local k = F.Known(id)
     return k.tag or k.char or (store().players[id] and store().players[id].chars[1] and store().players[id].chars[1].name) or "?"
 end
 
--- Shared only through the guild switch, and neither a Battle.net friend nor on your friends list: a
--- guildmate who is also a friend counts as a friend (popups and all).
 function F.IsGuildOnly(id)
     if store().shared[id] then return false end
     local k = store().known[id] or {}
@@ -469,7 +521,6 @@ function F.Unseen()
     return n
 end
 
--- You killed a friend's nemesis: the Avenged tab counts it.
 function F.Avenged(id)
     local s = store()
     s.avenged, s.lastAvenged = (s.avenged or 0) + 1, { id = id, time = time() }
@@ -479,14 +530,11 @@ function F.MarkSeen() for _, e in ipairs(store().recent) do e.seen = true end en
 
 function F.Recent() return store().recent end
 
--- A record's deaths per level, or one character's when char is given.
 local function perLevel(r, char)
     if char then return char.level > 0 and char.deaths / char.level or 0 end
     return r.levels > 0 and r.deaths / r.levels or 0
 end
 
--- A record's (or one of its characters') deaths, longest life, dungeon or battleground deaths in a
--- period ("all", "day", "week", "month"); a record sent before the period began counts nothing in it.
 local PER_PERIOD = { deaths = "pDeaths", longest = "pLongest", dungeon = "pDungeon", bg = "pBg" }
 function F.Value(r, kind, period, char)
     local of = char or r
@@ -500,15 +548,152 @@ function F.Char(rec, name)
     for _, c in ipairs(rec and rec.chars or {}) do if c.name == name then return c end end
 end
 
--- One row per player you share with, and you. kind: "deaths", "perLevel", "longest" or "avenged";
--- period, for deaths and longest life: "all" (or nil), "day", "week" or "month".
+local sourceLog
+
+local function countBefore(id, t)
+    local rec = store().players[id]
+    if not rec then return 0 end
+    if rec.logFull then
+        local n = 0
+        for _, d in ipairs(sourceLog(id)) do
+            if d.time < t and not ns.BattleDeath(d) then n = n + 1 end
+        end
+        return n
+    end
+    if not rec.last or rec.last.time < t then return rec.deaths end
+end
+
+function F.PersonNumber(id, t, number)
+    if not number then return nil end
+    for _, other in ipairs(F.Ids(id)) do
+        if other ~= id then
+            local n = countBefore(other, t)
+            if not n then return nil end
+            number = number + n
+        end
+    end
+    return number
+end
+
+local function renumbered(id, e)
+    if not e then return nil end
+    local copy = {}
+    for k, v in pairs(e) do copy[k] = v end
+    copy.number = F.PersonNumber(id, e.time or 0, e.number)
+    return copy
+end
+
+local function addInto(into, from)
+    for _, p in ipairs(F.PERIODS) do into[p] = (into[p] or 0) + (from and from[p] or 0) end
+end
+
+local function topBy(list, key, keep)
+    local byKey, out = {}, {}
+    for _, x in ipairs(list) do
+        local k = key(x)
+        if byKey[k] then
+            byKey[k].kills = (byKey[k].kills or 0) + (x.kills or 0)
+            byKey[k].deaths = byKey[k].deaths and byKey[k].deaths + (x.deaths or 0)
+        else
+            local copy = {}
+            for f, v in pairs(x) do copy[f] = v end
+            byKey[k] = copy
+            out[#out + 1] = copy
+        end
+    end
+    local count = function(x) return x.kills or x.deaths or 0 end
+    table.sort(out, function(a, b)
+        if count(a) ~= count(b) then return count(a) > count(b) end
+        return key(a) < key(b)
+    end)
+    for i = #out, keep + 1, -1 do out[i] = nil end
+    return out
+end
+
+local function merge(ids, recs)
+    local m = { id = ids[1], v = 0, deaths = 0, levels = 0, chars = {}, avenged = 0, repair = 0, ran = 0, ghost = 0, hit = 0,
+        bg = 0, dungeon = 0, pDeaths = {}, pLongest = {}, pDungeon = {}, pBg = {}, earlier = {}, records = {}, logFull = true }
+    local killers, all, zones = {}, {}, {}
+    for i, r in ipairs(recs) do
+        local id = ids[i]
+        m.v, m.deaths, m.levels = m.v + r.v, m.deaths + r.deaths, m.levels + r.levels
+        m.avenged, m.repair, m.ghost = m.avenged + (r.avenged or 0), m.repair + (r.repair or 0), m.ghost + (r.ghost or 0)
+        m.bg, m.dungeon = m.bg + (r.bg or 0), m.dungeon + (r.dungeon or 0)
+        m.format = math.min(m.format or r.format or 1, r.format or 1)
+        m.got = math.min(m.got or r.got or 0, r.got or 0)
+        m.logFull = m.logFull and r.logFull or nil
+        m.wantLog = m.wantLog or r.wantLog
+        if (r.longest or 0) > (m.longest or 0) then m.longest, m.longestChar, m.longestAt = r.longest, r.longestChar, r.longestAt end
+        if (r.dayMost or 0) > (m.dayMost or 0) then m.dayMost, m.dayMostDay = r.dayMost, r.dayMostDay end
+        if (r.hit or 0) > m.hit then m.hit, m.hitWhat, m.hitTime = r.hit, r.hitWhat, r.hitTime end
+        if (r.ran or 0) > m.ran then m.ran, m.ranZone, m.ranTime, m.runSecs = r.ran, r.ranZone, r.ranTime, r.runSecs end
+        if r.avengedAt and r.avengedAt > (m.avengedAt or 0) then m.avengedId, m.avengedAt = r.avengedId, r.avengedAt end
+        local fresh = {}
+        for _, p in ipairs(F.PERIODS) do fresh[p] = r.sentAt and r.sentAt >= ns.PeriodStart(p) end
+        for _, p in ipairs(F.PERIODS) do
+            if fresh[p] then
+                m.pDeaths[p] = (m.pDeaths[p] or 0) + (r.pDeaths[p] or 0)
+                m.pDungeon[p] = (m.pDungeon[p] or 0) + (r.pDungeon and r.pDungeon[p] or 0)
+                m.pBg[p] = (m.pBg[p] or 0) + (r.pBg and r.pBg[p] or 0)
+                m.pLongest[p] = math.max(m.pLongest[p] or 0, r.pLongest[p] or 0)
+            end
+        end
+        m.sentAt = math.max(m.sentAt or 0, r.sentAt or 0)
+        for _, c in ipairs(r.chars) do m.chars[#m.chars + 1] = c end
+        for _, k in ipairs(r.killers) do killers[#killers + 1] = k end
+        for _, k in ipairs(r.allKillers or {}) do all[#all + 1] = k end
+        for _, z in ipairs(r.zones or {}) do zones[#zones + 1] = z end
+        for _, e in ipairs(r.earlier or {}) do m.earlier[#m.earlier + 1] = renumbered(id, e) end
+        for _, e in ipairs(r.records or {}) do m.records[#m.records + 1] = renumbered(id, e) end
+        if r.last and (not m.last or r.last.time > m.last.time) then m.last, m.nem = renumbered(id, r.last), r.nem end
+    end
+    for _, p in ipairs(F.PERIODS) do
+        m.pDeaths[p], m.pDungeon[p], m.pBg[p], m.pLongest[p] = m.pDeaths[p] or 0, m.pDungeon[p] or 0, m.pBg[p] or 0, m.pLongest[p] or 0
+    end
+    table.sort(m.chars, function(a, b) return a.name < b.name end)
+    m.killers = topBy(killers, function(k) return k.npc end, F.KILLERS)
+    m.allKillers = topBy(all, function(k) return k.kind .. k.key end, F.ALL_KILLERS)
+    m.zones = topBy(zones, function(z) return z.zone end, F.ZONES)
+    return m
+end
+
+local merged = {}
+function F.Record(id)
+    local s, ids = store(), F.Ids(id)
+    if #ids == 1 then return s.players[ids[1]] end
+    local recs, key = {}, {}
+    for i, x in ipairs(ids) do
+        recs[i] = s.players[x]
+        key[i] = x .. ":" .. recs[i].v .. ":" .. tostring(recs[i].log) .. ":" .. (recs[i].log and #recs[i].log or 0)
+    end
+    key = table.concat(key, ",")
+    local c = merged[ids[1]]
+    if not (c and c.key == key) then
+        c = { key = key, rec = merge(ids, recs) }
+        merged[ids[1]] = c
+    end
+    return c.rec
+end
+
+local function people()
+    local out, seen = {}, {}
+    for id in pairs(store().players) do
+        if F.Shares(id) then
+            local p = F.Primary(id)
+            if not seen[p] then
+                seen[p] = true
+                out[#out + 1] = p
+            end
+        end
+    end
+    return out
+end
+
 function F.Rows(kind, period)
-    local s, rows = store(), {}
+    local rows = {}
     local mine = F.Mine()
     rows[1] = { rec = mine, you = true }
-    for id, r in pairs(s.players) do
-        if F.Shares(id) then rows[#rows + 1] = { rec = r, id = id } end
-    end
+    for _, id in ipairs(people()) do rows[#rows + 1] = { rec = F.Record(id), id = id } end
     local value = kind == "perLevel" and perLevel or kind == "avenged" and function(r) return r.avenged or 0 end
         or function(r) return F.Value(r, kind, period) end
     for _, row in ipairs(rows) do row.value, row.deaths = value(row.rec), row.rec.deaths end
@@ -522,18 +707,16 @@ end
 
 F.PerLevel = perLevel
 
--- Players you share with, for the pane: Battle.net and other friends, then the guild.
 function F.Players()
     local out = {}
-    for id, r in pairs(store().players) do
-        if F.Shares(id) then out[#out + 1] = r end
-    end
-    table.sort(out, function(a, b) return a.deaths > b.deaths end)
+    for _, id in ipairs(people()) do out[#out + 1] = F.Record(id) end
+    table.sort(out, function(a, b)
+        if a.deaths ~= b.deaths then return a.deaths > b.deaths end
+        return a.id < b.id
+    end)
     return out
 end
 
--- Takes a record a friend sent or passed on. Returns what changed, newest first, or nil when it
--- isn't newer than the one already held or isn't someone you share with.
 function F.Take(rec)
     local s = store()
     if not rec or rec.id == F.Me() or not F.Shares(rec.id) then return nil end
@@ -544,7 +727,6 @@ function F.Take(rec)
         rec.log, rec.logFull, rec.logNewest, rec.wantLog = old.log, old.logFull, old.logNewest, old.wantLog
     end
     s.players[rec.id] = rec
-    -- Recent keeps its own copy of each death; a newer record can carry the hits an older one didn't.
     local sent = {}
     for _, e in ipairs(rec.earlier or {}) do sent[e.time] = e end
     if rec.last then sent[rec.last.time] = rec.last end
@@ -559,23 +741,25 @@ function F.Take(rec)
         local seen = old.last and old.last.time
         for _, e in ipairs(rec.earlier or {}) do
             if seen and e.time > seen or not seen and (e.number or 0) > old.deaths then
-                F.AddEvent({ kind = "death", id = rec.id, last = e, time = e.time })
+                F.AddEvent({ kind = "death", id = rec.id, last = renumbered(rec.id, e), time = e.time })
             end
         end
-        changes[#changes + 1] = { kind = "death", id = rec.id, last = rec.last, deaths = rec.deaths, before = old.deaths,
+        local total = F.Record(rec.id).deaths
+        local before = total - (rec.deaths - old.deaths)
+        changes[#changes + 1] = { kind = "death", id = rec.id, last = renumbered(rec.id, rec.last), deaths = total, before = before,
             time = rec.last.time }
         local was = F.Char(old, rec.last.char)
         if rec.nem and (was and was.nemNpc or nil) ~= rec.nem.npc then
             changes[#changes + 1] = { kind = "nemesis", id = rec.id, nem = rec.nem, zone = rec.last.zone, time = rec.last.time }
         end
-        local passed
+        local passed, me = nil, F.Primary(rec.id)
         for _, r in ipairs(F.Rows("deaths")) do
-            if r.id ~= rec.id and r.deaths < rec.deaths and r.deaths >= old.deaths and (not passed or r.deaths > passed.deaths) then
+            if r.id ~= me and r.deaths < total and r.deaths >= before and (not passed or r.deaths > passed.deaths) then
                 passed = r
             end
         end
         if passed then
-            changes[#changes + 1] = { kind = "passed", id = rec.id, other = passed.you and "you" or passed.id, deaths = rec.deaths,
+            changes[#changes + 1] = { kind = "passed", id = rec.id, other = passed.you and "you" or passed.id, deaths = total,
                 time = rec.last.time }
         end
     end
@@ -583,7 +767,6 @@ function F.Take(rec)
     return changes
 end
 
--- Each field of a saved death and of each hit, with its kind: s text, n number, b true or nothing.
 local DEATH_FIELDS = { { "char", "s" }, { "name", "s" }, { "time", "n" }, { "level", "n" }, { "zone", "s" }, { "subzone", "s" },
     { "cause", "s" }, { "killer", "s" }, { "npc", "n" }, { "spell", "s" }, { "amount", "n" }, { "alive", "n" }, { "ghost", "n" },
     { "ran", "n" }, { "runSecs", "n" }, { "repair", "n" }, { "instance", "s" }, { "pet", "b" }, { "killerClassFile", "s" },
@@ -640,9 +823,8 @@ function F.DeathFrom(text)
     return d
 end
 
--- A friend's deaths are kept as the text they came in, oldest first, and read back when their pages open;
--- a death whose text doesn't change stays the same table, so an open death stays open.
-local decoded = {}   -- id -> { log, n, newest: the texts read; list: their deaths; of: text -> death }
+-- A death whose text doesn't change stays the same table, so an open death stays open.
+local decoded = {}
 local function keepTexts(rec, texts, from, total)
     local log = from == 1 and {} or rec.log or {}
     for i, t in ipairs(texts) do log[from + i - 1] = t end
@@ -659,7 +841,6 @@ function F.TakeDeaths(id, list, from, total)
     keepTexts(rec, texts, from, total)
 end
 
--- One batch as it travels; a batch that doesn't follow on from the deaths held is left out.
 function F.TakeDeathsText(id, from, total, text)
     local rec = store().players[id]
     if not rec or (from ~= 1 and from ~= #(rec.log or {}) + 1) then return false end
@@ -676,7 +857,6 @@ function F.Holding(id)
     return rec and rec.log and #rec.log or 0, rec and rec.logNewest or 0
 end
 
--- You opened this friend in the window: their deaths are asked for from now on.
 function F.WantDeaths(id)
     local rec = store().players[id]
     if rec then rec.wantLog = true end
@@ -687,10 +867,12 @@ function F.WantsDeaths(id)
     return rec ~= nil and rec.wantLog == true
 end
 
--- Their Death Tracker sends deaths, so the rest are on the way.
-function F.SendsDeaths(id)
-    local rec = store().players[id]
-    return rec ~= nil and (rec.format or 1) >= 7
+function F.SendsDeaths(person)
+    for _, id in ipairs(F.Ids(person)) do
+        local rec = store().players[id]
+        if not rec or (rec.format or 1) < 7 then return false end
+    end
+    return true
 end
 
 local function asDeath(e)
@@ -701,7 +883,6 @@ local function asDeath(e)
         killerRace = e.killerRace, killerClass = e.killerClass, killerRank = e.killerRank, joke = e.joke }
 end
 
--- A record from a version that doesn't send every death: the deaths it carries, as saved deaths.
 local function recordDeaths(rec)
     local seen, out = {}, {}
     local function keep(e)
@@ -717,7 +898,7 @@ local function recordDeaths(rec)
 end
 
 local fromRecord = setmetatable({}, { __mode = "k" })
-function F.Log(id)
+sourceLog = function(id)
     local rec = store().players[id]
     if not rec then return {} end
     if rec.logFull then
@@ -737,6 +918,33 @@ function F.Log(id)
     return fromRecord[rec]
 end
 
+-- A death that stays the same table stays open in the details panel.
+local mergedLogs = {}
+function F.Log(id)
+    local ids = F.Ids(id)
+    if #ids == 1 then return sourceLog(ids[1]) end
+    local lists, key = {}, {}
+    for i, x in ipairs(ids) do
+        lists[i] = sourceLog(x)
+        key[i] = tostring(lists[i]) .. ":" .. #lists[i] .. ":" .. store().players[x].v
+    end
+    key = table.concat(key, ",")
+    local c = mergedLogs[ids[1]]
+    if c and c.key == key then return c.list end
+    local list, of = {}, {}
+    for i, x in ipairs(ids) do
+        for _, d in ipairs(lists[i]) do
+            local copy = c and c.of[d] or renumbered(x, d)
+            copy.number = F.PersonNumber(x, d.time, d.number)
+            of[d] = copy
+            list[#list + 1] = copy
+        end
+    end
+    table.sort(list, function(a, b) return a.time < b.time end)
+    mergedLogs[ids[1]] = { key = key, list = list, of = of }
+    return list
+end
+
 function F.Find(id, e)
     for _, d in ipairs(F.Log(id)) do
         if d.time == e.time and d.name == e.char then return d end
@@ -745,12 +953,10 @@ function F.Find(id, e)
 end
 
 function F.Partial(id)
-    local rec = store().players[id]
+    local rec = F.Record(id)
     return rec ~= nil and not rec.logFull
 end
 
--- "Morwenna, Grimtusk and Kaelthorn"; names may start with "you". With many, from that many on:
--- "Morwenna and 3 friends".
 function F.Names(names, many)
     if many and #names >= many then return ("%s and %d friends"):format(names[1], #names - 1) end
     return ns.UI.AndList(names)
@@ -762,7 +968,6 @@ function F.NamesOf(ids, many)
     return F.Names(list, many)
 end
 
--- Popups wait until you're out of combat, alive and out of a battleground.
 local waiting = {}
 local function free() return not InCombatLockdown() and not UnitIsDeadOrGhost("player") and not ns.InBattle() end
 
@@ -781,21 +986,17 @@ for _, event in ipairs({ "PLAYER_REGEN_ENABLED", "PLAYER_UNGHOST", "PLAYER_ALIVE
     ns.OnEvent(event, flush)
 end
 
--- How often a mob (NPC ID) has killed each friend: { { id, kills } }, most first.
 function F.KilledFriends(npc)
     local out = {}
-    for id, r in pairs(store().players) do
-        if F.Shares(id) then
-            for _, k in ipairs(r.killers) do
-                if k.npc == npc then out[#out + 1] = { id = id, kills = k.kills } end
-            end
+    for _, r in ipairs(F.Players()) do
+        for _, k in ipairs(r.killers) do
+            if k.npc == npc then out[#out + 1] = { id = r.id, kills = k.kills } end
         end
     end
     table.sort(out, function(a, b) return a.kills > b.kills end)
     return out
 end
 
--- Friends whose nemesis that mob is, on the character they play now.
 function F.NemesisOf(npc)
     local out = {}
     for id, r in pairs(store().players) do
@@ -803,4 +1004,21 @@ function F.NemesisOf(npc)
         if c and c.nemNpc == npc then out[#out + 1] = id end
     end
     return out
+end
+
+local function addMixed(chars, into)
+    local seen = {}
+    for _, c in pairs(chars) do if c.faction then seen[c.faction] = true end end
+    if not (seen.Horde and seen.Alliance) then return end
+    for _, c in pairs(chars) do if c.faction and c.name then into[c.name] = c.faction end end
+end
+
+local factionOf, builtAt = {}, nil
+function ns.CharFaction(name)
+    if builtAt ~= GetTime() then
+        factionOf, builtAt = {}, GetTime()
+        addMixed(ns.db.characters, factionOf)
+        for _, rec in ipairs(F.Players()) do addMixed(rec.chars, factionOf) end
+    end
+    return factionOf[name]
 end

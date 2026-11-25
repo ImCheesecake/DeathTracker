@@ -1,5 +1,3 @@
--- The history window's Records page: bests and worsts, each a click away from the deaths behind it.
--- With a friend picked in the pane: their records, and beside yours to compare.
 local _, ns = ...
 local UI = ns.UI
 local Shell = ns.HistoryShell
@@ -7,7 +5,6 @@ local H = ns.History
 
 local BOOK = "Interface\\Icons\\INV_Misc_Book_09"
 local ORDER = { "longestLife", "hardestHit", "mostInDay", "mostExpensive", "longestRun", "longestGhost" }
--- Your own page: every record, then where you died (board "Records, more rows").
 local OWN = { "longestLife", "shortestLife", "hardestHit", "mostExpensive", "longestRun", "longestGhost", "mostInDay",
     "mostInHour", "longestWithout", "perLevel" }
 local WHERE = { { "open", "Open world", "the open world" }, { "dungeon", "Dungeons", "dungeons" }, { "raid", "Raids", "raids" },
@@ -19,7 +16,7 @@ local COLUMN = 120
 local WATCH_PAD = 30
 
 local parts
-local mine   -- your side of the compare: one of your characters' names, or nil for every one
+local mine
 
 local function valueText(key, value)
     if key == "longestLife" or key == "shortestLife" or key == "longestGhost" then return UI.Duration(value) end
@@ -29,7 +26,6 @@ local function valueText(key, value)
     return value
 end
 
--- withSpell: the death names the spell that ended it ("Lord Kazzak's Shadow Bolt Volley").
 local function deathRecord(key, r, withSpell)
     local d = r.death
     return { kind = "record", title = TITLES[key], value = valueText(key, r.value),
@@ -38,7 +34,6 @@ local function deathRecord(key, r, withSpell)
         help = "Show that death.", focus = { death = d, text = "the death " .. UI.At(d.time) } }
 end
 
--- player: the record is that player's kills in the stream.
 local function streamRecord(title, s, value, player)
     local name = "the stream of " .. UI.Date(s.from, "%a")
     local item = { kind = "record", title = title, value = value, lines = { UI.TipPair("Started", UI.At(s.from)) }, help = "Show every death in that stream.",
@@ -51,11 +46,10 @@ local function streamRecord(title, s, value, player)
     return item
 end
 
--- The characters the filter keeps, yours or a friend's: their levels together, and each one's name and level.
 local function levelsOf(f)
     local chars, sum = {}, 0
     if f.of then
-        for _, c in ipairs(ns.Friends.Store().players[f.of].chars) do
+        for _, c in ipairs(ns.Friends.Record(f.of).chars) do
             if not f.name or c.name == f.name then chars[#chars + 1] = c end
         end
     else
@@ -69,7 +63,7 @@ local function levelsOf(f)
         return a.name < b.name
     end)
     local names = {}
-    for i, c in ipairs(chars) do names[i] = c.name .. " " .. (c.level or 1) end
+    for i, c in ipairs(chars) do names[i] = UI.CharName(c.name) .. " " .. (c.level or 1) end
     return sum, table.concat(names, ", ")
 end
 
@@ -112,7 +106,7 @@ local function recordItems(r, f)
             local summary = ("%s on %s"):format(UI.Count(m.deaths, "death", "deaths"), day)
             if m.killer and m.killerKills > 1 then summary = ("%s, %d to %s"):format(summary, m.killerKills, m.killer) end
             items[#items + 1] = { kind = "record", title = TITLES[key], value = m.deaths,
-                lines = { UI.TipPair("Character", m.name), summary .. "." },
+                lines = { UI.TipPair("Character", UI.CharName(m.name)), summary .. "." },
                 help = "Show every death that day.", focus = { day = m.day, text = "deaths on " .. day } }
         elseif r[key] then
             items[#items + 1] = deathRecord(key, r[key], key == "hardestHit")
@@ -138,7 +132,6 @@ local function recordItems(r, f)
     return items
 end
 
--- One side of the compare: { f = its filter, rec = its record, char = one of its characters }.
 local function sideRecords(side)
     local f = {}
     for k, v in pairs(side.f) do f[k] = v end
@@ -207,7 +200,7 @@ end
 
 local function versusItems(id, name)
     local F = ns.Friends
-    local rec, yours = F.Store().players[id], F.Mine()
+    local rec, yours = F.Record(id), F.Mine()
     if mine and not Shell.YourKey(mine) then mine = nil end
     local theirs, own = Shell.Filter(), Shell.Filter()
     own.of, own.name, own.char = nil, nil, mine and Shell.YourKey(mine)

@@ -1,9 +1,5 @@
--- The death's joke: lines per cause, and lines that fit the death itself (the mob's kind, the killer,
--- the killing blow), picked for each death, which the card shows and the Streamer.bot line carries.
 local _, ns = ...
 
--- Ten per cause. Filled in from the death: {killer}, {kills} (its kills on you), {name} (your first
--- name), {faction}, {spell}, {amount}, {overkill}, {killerLevel}, {level}, {gap} and {alive}.
 ns.JOKES = {
     mob = { "{killer} {kills}, {name} 0.", "{killer} wins this round.", "Outplayed by {killer}.",
         "{killer} didn't even break a sweat.", "That's {kills} for {killer}.", "Should have pulled one at a time.",
@@ -38,15 +34,11 @@ ns.JOKES = {
         "File under: mysterious.", "The recap shrugs.", "Something out there doesn't like {name}.",
         "The coroner is baffled.", "Death by ???", "Even the game doesn't know." },
 }
--- Lines that only fit some deaths: "repeat" once the mob has killed you as often as a nemesis
--- needs, "world" only out in the world, never in a battleground or an arena.
 ns.JOKES_WHEN = {
     ["{killer} is getting good at this."] = "repeat",
     ["Should have stayed in town."] = "world", ["Ganked."] = "world",
     ["World PvP is alive and well."] = "world", ["Contested territory, as advertised."] = "world",
 }
--- Lines that fit what a death records beyond its cause (the killer's rank and level, the killing blow,
--- a short life), filled in from it.
 ns.FIT_JOKES = {
     elite = { "Meant for a group. Met by you.", "The gold dragon was a warning.",
         "Main character energy. Not enough health.", "Soloing that was optional.", "Party of one: denied.",
@@ -83,7 +75,6 @@ ns.FIT_JOKES = {
     overkill = { "Overkill by {overkill}. Rude.", "Dead twice over.", "The extra damage was personal.",
         "Killed you, then kept going.", "That was more than enough." },
 }
--- A player killer's class: only about the class, never a school or one ability.
 ns.CLASS_JOKES = {
     WARRIOR = { "Warriors don't do subtle.", "Should have kited.", "Rage well spent.", "Hit by a wall of plate.",
         "All rage, no regrets." },
@@ -104,7 +95,6 @@ ns.CLASS_JOKES = {
     DRUID = { "Mauled by a cat. Or a bear. Or a tree.", "Shapeshifted into your problem.", "Bear with it.",
         "Never trust a tree.", "Hugs trees, hits people." },
 }
--- Lines for a mob of a known kind, chosen by its body (not its name: Sunscale Screecher is a raptor).
 ns.KIND_JOKES = {
     spider = { "Eight legs, zero mercy.", "Somehow the spider had better footwork.", "Webbed, wrapped and saved for later.",
         "Arachnophobia: justified.", "Should have brought a bigger boot.",
@@ -303,7 +293,7 @@ ns.KIND_JOKES = {
         "The dead stood up. You lay down.", "Bones and brute force.", "Too big to be this dead.", "Grave mistake.",
         "Dead weight.", "Crushed by the walking dead." },
 }
--- Model files (creature/<folder>/*.m2) of each kind's bodies, from Forever's client data (build 70862).
+-- Model file IDs (creature/<folder>/*.m2) of each kind's bodies.
 local BODIES = {
     spider = { 124166, 124903, 124904, 126124 },
     wolf = { 126487, 126488, 123388, 123410, 123418 },
@@ -375,8 +365,6 @@ end
 
 local probe
 
--- done(kind), or done(nil) for a mob of no kind here. Its body is saved by NPC ID once known; a model
--- that doesn't answer within a second gives nil and is asked again next time.
 function ns.MobKind(npc, done)
     local known = ns.db.mobBodies[npc]
     if known then return done(KIND_OF[known]) end
@@ -387,13 +375,12 @@ function ns.MobKind(npc, done)
     end)
 end
 
--- The game gives a skull (10 or more levels above you) as level -1: far above, its number unknown.
+-- The game gives a skull level (10 or more above you) as -1.
 local SKULL = -1
 local function known(level) return level ~= SKULL and level or nil end
 
 local SCHOOLS = { [2] = "holy", [4] = "fire", [8] = "nature", [16] = "frost", [32] = "shadow", [64] = "arcane" }
 
--- Every set of lines that fits this death; with none, the cause's own lines.
 local function fitting(d, kind)
     local F, sets = ns.FIT_JOKES, {}
     local function take(list) if list then sets[#sets + 1] = list end end
@@ -422,10 +409,8 @@ local function fitting(d, kind)
     return sets
 end
 
--- A line whose names can't all be filled in from this death is left out. Of the rest, one shown longest
--- ago (saved by line, across logins). name, kills: who died and how often, when it isn't you.
 function ns.Joke(d, kind, name, kills)
-    local cause = ns.JOKES[d.cause] and d.cause or "unknown"   -- "other" shares unknown's lines
+    local cause = ns.JOKES[d.cause] and d.cause or "unknown"
     kills = kills or d.npc and #ns.Deaths({ npc = d.npc, char = d.char }) or 0
     local fill = { killer = d.killer or ns.DeathTitle(d), kills = d.npc and kills, name = name or (UnitName("player")),
         faction = d.killerFaction, spell = d.spell, amount = d.amount, overkill = d.overkill,

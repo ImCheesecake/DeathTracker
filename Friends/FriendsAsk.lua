@@ -1,21 +1,18 @@
--- Asking to share death counts: the menu of players online with Death Tracker, "Share death counts"
--- in Blizzard's right-click menus, the Yes/No popup on the other side, and where to turn on the guild.
 local _, ns = ...
 local F, L, UI = ns.Friends, ns.FriendsLink, ns.UI
 local A = {}
 ns.FriendsAsk = A
 
-A.LOOKING = 1            -- seconds the menu says "Looking..." while answers come in
+A.LOOKING = 1
 A.NO_ANSWER = 120
 A.REFUSED_FOR = 24 * 60 * 60
 
-local asked = {}         -- player id -> true once asked this session; a late yes still counts
-local waiting = {}       -- player id -> true while the 2 minutes run
+local asked = {}
+local waiting = {}
 
--- "Ashka" for a Battle.net friend, else the character's name.
 local function who(id) return F.Name(id) end
+local function sharing(id) return F.Store().shared[id] or F.SharesAccount(F.Account(id)) end
 
--- Where a player online with Death Tracker shows in the menu.
 function A.GroupOf(id)
     local r = L.Online(id)
     if not r then return nil end
@@ -27,19 +24,18 @@ end
 
 A.GROUPS = { "Battle.net", "Friends", "Group" }
 
--- Online players with Death Tracker who don't share with you yet, by group.
 function A.Choices()
     local out = { ["Battle.net"] = {}, Friends = {}, Group = {} }
     for _, p in ipairs(L.OnlinePlayers()) do
         local g = A.GroupOf(p.id)
-        if g and not F.Store().shared[p.id] then table.insert(out[g], p.id) end
+        if g and not sharing(p.id) then table.insert(out[g], p.id) end
     end
     for _, list in pairs(out) do table.sort(list, function(a, b) return who(a) < who(b) end) end
     return out
 end
 
 function A.Ask(id)
-    if waiting[id] or F.Store().shared[id] then return end
+    if waiting[id] or sharing(id) then return end
     if not L.SendTo(id, "A^" .. F.Me()) then return end
     asked[id], waiting[id] = true, true
     UI.Say(("Asked %s to share death counts."):format(who(id)))
@@ -57,17 +53,16 @@ local function shareWith(id)
     ns.Changed()
 end
 
--- Where the Recent tab says a share came from.
 local function how(id) return F.Known(id).tag and "Battle.net" or "Friend" end
 
 L.On("A", function(id)
     if not A.GroupOf(id) then return end
     local s = F.Store()
-    if s.shared[id] then return L.SendTo(id, "Y^" .. F.Me()) end
+    if sharing(id) then return L.SendTo(id, "Y^" .. F.Me()) end
     if s.refused[id] and time() - s.refused[id] < A.REFUSED_FOR then return L.SendTo(id, "N^" .. F.Me()) end
     F.WhenFree(function()
         local k = F.Known(id)
-        local detail = k.tag and k.char and ("%s (%s) is asking. You'd see each other's deaths on the Friends page."):format(k.tag, k.char)
+        local detail = k.tag and k.char and ("%s (%s) is asking. You'd see each other's deaths on the Friends page."):format(k.tag, UI.CharName(k.char))
             or "They're asking. You'd see each other's deaths on the Friends page."
         UI.Ask(("Share death counts with %s?"):format(who(id)), detail, function()
             L.SendTo(id, "Y^" .. F.Me())
@@ -81,8 +76,8 @@ L.On("A", function(id)
 end)
 
 L.On("Y", function(id)
-    if not asked[id] and not F.Store().shared[id] then return end
-    local first = not F.Store().shared[id]
+    if not asked[id] and not sharing(id) then return end
+    local first = not sharing(id)
     asked[id], waiting[id] = nil, nil
     shareWith(id)
     if first then
@@ -99,7 +94,7 @@ L.On("N", function(id)
 end)
 
 function A.StopSharing(id)
-    L.SendTo(id, "S^" .. F.Me())
+    for _, x in ipairs(F.SameAccount(id)) do L.SendTo(x, "S^" .. F.Me()) end
     F.Unshare(id)
     ns.Changed()
 end
@@ -119,7 +114,6 @@ local function guildmates()
     return n
 end
 
--- While guild sharing is off and guildmates use Death Tracker: where to turn it on, else nil.
 function A.GuildHint()
     local n = guildmates()
     if ns.db.settings.friendsGuild or n == 0 then return nil end
@@ -140,7 +134,6 @@ function A.SetGuild(on)
     ns.Changed()
 end
 
--- The menu "Share with a friend" opens: who is online with Death Tracker and not sharing yet.
 function A.FillMenu(root, looking)
     root:CreateTitle("Online with Death Tracker")
     if looking then return root:CreateTitle("Looking...") end
@@ -151,8 +144,8 @@ function A.FillMenu(root, looking)
             root:CreateTitle(group)
             for _, id in ipairs(choices[group]) do
                 local k = F.Known(id)
-                local name = k.tag and UI.FriendName(k.tag, k.char or "")
-                    or UI.Colored(k.char or who(id), UI.ClassColor(k.class) or UI.COLOR.text)
+                local name = k.tag and UI.FriendName(k.tag, UI.CharName(k.char) or "")
+                    or UI.Colored(UI.CharName(k.char) or who(id), UI.ClassColor(k.class) or UI.COLOR.text)
                 root:CreateButton(name, function() A.Ask(id) end)
             end
         end
@@ -160,7 +153,6 @@ function A.FillMenu(root, looking)
     if not any then root:CreateTitle("No one online has Death Tracker.") end
 end
 
--- The player a right-click menu is about, if they're online with Death Tracker and not sharing yet.
 local function playerIn(contextData)
     local gameAccount
     if contextData.bnetIDAccount then
@@ -171,7 +163,7 @@ local function playerIn(contextData)
         or contextData.name
     for _, p in ipairs(L.OnlinePlayers()) do
         local match = (gameAccount and p.route.bn == gameAccount) or (name and p.route.name == name)
-        if match and not F.Store().shared[p.id] and A.GroupOf(p.id) then return p.id end
+        if match and not sharing(p.id) and A.GroupOf(p.id) then return p.id end
     end
 end
 

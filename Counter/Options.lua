@@ -1,5 +1,3 @@
--- The addon's page in Blizzard's options window (Esc, Options, AddOns): what shows on screen,
--- the Streamer.bot line, and resetting or deleting the counts.
 local addonName, ns = ...
 local UI = ns.UI
 
@@ -23,13 +21,12 @@ local function cardOn() return ns.db.settings.card end
 local function posterOn() return ns.db.settings.card and ns.db.settings.poster end
 local CARD_OFF = "Turn on Show the death card to preview it."
 
--- Blizzard's options window sits over the card and the poster, so it closes first.
+-- Blizzard's options window sits over the card and the poster.
 local function preview(kind)
     HideUIPanel(SettingsPanel)
     ns.Preview(kind)
 end
 
--- The live counts go in the tooltips, which are built on mouse-over.
 local function button(label, text, tooltip, click, isOn)
     return { kind = "button", label = label, text = text, tooltip = tooltip, click = click, isOn = isOn }
 end
@@ -52,7 +49,6 @@ ns.OnEvent("PLAYER_LOGIN", function()
             ("Press %s to copy it. Then in Streamer.bot: %s, paste it into Import String, click %s, then %s when it "
                 .. "asks to run the setup."):format(key("Ctrl+C"), key("Import"), key("Import"), key("Yes")))
     end)
-    -- The addon can't see what Streamer.bot holds, only which code was last opened here.
     function importCode.isNew() return ns.Streaming() and ns.db.importSeen ~= ns.STREAMERBOT_IMPORT_ID end
     function importCode.note() return importCode.isNew() and "This update changed the code. Import it again." or nil end
     local allTime = check("counterAllTime", "Show all-time deaths", "Your deaths of all time, beside this stream's count.",
@@ -89,6 +85,9 @@ ns.OnEvent("PLAYER_LOGIN", function()
         check("recapMusic", "Play music with the monthly recap",
             "Rocky Road to Dublin while the recap plays, at your game's music volume."),
         check("tooltips", "Show deaths in tooltips", "A mob or player's tooltip says how often they have killed you."),
+        check("grudge", "Warn me when a player who killed me or a friend is near",
+            "A warning in the middle of the screen with a battleground horn, and a line in chat. Friends who share "
+                .. "counts get a chat line saying where. Never in battlegrounds or arenas."),
         check("minimapButton", "Show the minimap button",
             "Shows or hides the Death Tracker button on the minimap.",
             nil, function(on) ns.ShowMinimapButton(on) end),
@@ -110,6 +109,16 @@ ns.OnEvent("PLAYER_LOGIN", function()
             end, tooltip = function()
                 return "Closes the settings and shows a trophy popup until you click it. Drag it where you "
                     .. "want trophies to pop up. Nothing is earned."
+            end },
+            { text = "Show a warning", isOn = function() return ns.db.settings.grudge end, click = function()
+                HideUIPanel(SettingsPanel)
+                ns.Grudge.Preview()
+            end, tooltip = function()
+                if not ns.db.settings.grudge then
+                    return "Turn on Warn me when a player who killed me or a friend is near to preview it."
+                end
+                return "Closes the settings and shows the warning for a player who killed you, with its sound and "
+                    .. "chat line. Nothing is saved or sent."
             end },
             { text = "Show a recap", click = function()
                 HideUIPanel(SettingsPanel)
@@ -146,7 +155,7 @@ ns.OnEvent("PLAYER_LOGIN", function()
             local d = ns.Deaths({}, 1)[1]
             if not d then return "No saved deaths." end
             return ("%s%s, %s, on %s. Deletes just this death."):format(d.number and ("Death #%d: "):format(d.number) or "",
-                ns.DeathTitle(d), UI.Ago(d.time), d.name)
+                ns.DeathTitle(d), UI.Ago(d.time), UI.CharName(d.name))
         end, function()
             local d = ns.Deaths({}, 1)[1]
             if not d then return end

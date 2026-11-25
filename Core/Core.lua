@@ -1,24 +1,20 @@
--- Counts each death: reads the Death Recap, saves the death for good (account-wide, per character)
--- and keeps the counts (this stream with Streamer.bot on, else this character) and the time played
--- since the last death.
 local addonName, ns = ...
 
 local charKey, char
-local ready = false        -- in the world and alive since the last death: a PLAYER_DEAD now is a new one
+local ready = false
 local pending = false
-local sessionStart         -- when the alive clock last started; nil while dead or a ghost
+local sessionStart
 local entered = false
 local listeners = { change = {}, death = {}, dying = {}, bounty = {}, payment = {} }
 local hooks = {}
 
 ns.DEFAULTS = { streamerbot = false, counter = true, counterPanel = true, counterLayout = "box",
     counterAllTime = true, allTimePerCharacter = false, chatDelay = 0, card = true, cardBattlegrounds = false, counterScale = 1, barScale = 1,
-    cardScale = 0.6, posterScale = 1, historyScale = 1, tooltips = true, poster = true, posterSounds = true, posterKept = false, minimapButton = true,
+    cardScale = 0.6, posterScale = 1, historyScale = 1, tooltips = true, grudge = true, poster = true, posterSounds = true, posterKept = false, minimapButton = true,
     recapMusic = true }
 
 function ns.OnChange(fn) table.insert(listeners.change, fn) end
 function ns.OnDeath(fn) table.insert(listeners.death, fn) end
--- The moment a death counts, before it's saved (its recap is read 0.3 to 1 s later): fn(time).
 function ns.OnDying(fn) table.insert(listeners.dying, fn) end
 function ns.OnBounty(fn) table.insert(listeners.bounty, fn) end
 function ns.OnPayment(fn) table.insert(listeners.payment, fn) end
@@ -43,7 +39,6 @@ function ns.AliveSeconds(now)
     return char.alive + (sessionStart and (now or time()) - sessionStart or 0)
 end
 
--- Your own spell, unknown and odd environments count as Other.
 ns.CAUSES = { { "mob", "Mobs" }, { "player", "Players" }, { "fall", "Falls" }, { "drown", "Drowning" },
     { "lava", "Lava" }, { "fire", "Fire" }, { "fatigue", "Fatigue" }, { "slime", "Slime" }, { "other", "Other" } }
 local OTHER = { self = true, unknown = true, other = true }
@@ -52,11 +47,6 @@ function ns.CauseKind(cause) return OTHER[cause] and "other" or cause end
 -- Forever's realm names end in their ruleset ("CAMWOWEU5Realm8PvP"); so does a character's key.
 function ns.Ruleset(charKey) return charKey and charKey:match("%d(%a+)$") end
 
--- A filter: { stream = true, char = key, cause = "drown" (a kind from ns.CAUSES), causes = { drown = true },
--- ruleset = "PvP", minLevel = 10, maxLevel = 20, npc = id, player = name, zone = name, spot = name,
--- day = "2026-11-03", death = a saved death, from = time, to = time (before it), since = time, name = a
--- character's name, of = a friend's id (their deaths instead of yours) }; every field is optional, and {}
--- keeps every death.
 local function matches(d, f, since)
     return d.time >= since
         and (not f.char or d.char == f.char)
@@ -89,7 +79,6 @@ function ns.Deaths(f, n)
     return out
 end
 
--- By kind, as in ns.CAUSES.
 function ns.CauseCounts(f)
     local out = {}
     for _, d in ipairs(ns.Deaths(f)) do
@@ -129,16 +118,14 @@ function ns.CharacterKey() return charKey end
 local TITLES = { fall = "Fall damage", drown = "Drowning", lava = "Lava", fire = "Fire", fatigue = "Fatigue",
     slime = "Slime", unknown = "Something", other = "Something" }
 
--- A killer's name can be secret (dungeons, bosses); only your own spell falls back to your name.
--- withSpell: "Lord Kazzak's Shadow Bolt Volley".
+-- A killer's name can be secret (dungeons, bosses).
 function ns.DeathTitle(d, withSpell)
     local title = TITLES[d.cause] or d.killer or (d.cause == "self" and d.name) or "Something"
     if withSpell and d.spell and not TITLES[d.cause] then title = title .. "'s " .. d.spell end
     return title
 end
 
--- Forever's battlegrounds and arena (client data, Map.db2, build 1.60.1.70245). Deaths saved before
--- d.instance (2026-11-11) are told by their zone, so only on an English client.
+-- Older deaths without d.instance are told by their English zone name.
 local BATTLE_ZONES = { ["Alterac Valley"] = true, ["Warsong Gulch"] = true, ["Arathi Basin"] = true,
     ["Darkspear Islands"] = true, ["Battle for Gilneas"] = true, ["Hyjal Crater"] = true }
 function ns.BattleZone(zone) return BATTLE_ZONES[zone] == true end
@@ -149,8 +136,8 @@ end
 
 local function readable(v) return type(v) == "string" and not issecretvalue(v) and v ~= "" end
 
--- Forever adds a random word to mob names in the Death Recap ("Azuregos Herbaliser"); the game's
--- own name for the unit (its tooltip, the target) has none. Learn that name per NPC ID.
+-- Forever adds a random word to mob names in the Death Recap ("Azuregos Herbaliser"); the unit's
+-- own name (its tooltip, the target) has none.
 local function learnName(npc, guid, recapName)
     local data = C_TooltipInfo.GetHyperlink("unit:" .. guid)
     local first = data and data.lines and data.lines[1] and data.lines[1].leftText
@@ -176,8 +163,7 @@ local function unitFor(guid)
     if target and canaccessvalue(target) and target == guid then return "target" end
 end
 
--- The killer's level (-1: a skull) and rank (elite, rare, ...) from its nameplate or the player's target;
--- only while one of them is still up.
+-- UnitLevel gives a skull level as -1.
 local function learnLevel(d, guid)
     local unit = unitFor(guid)
     if not unit then return end
@@ -186,7 +172,6 @@ local function learnLevel(d, guid)
     if readable(rank) and rank ~= "normal" then d.killerRank = rank end
 end
 
--- A new nemesis is checked once the death is counted, not here. Milestones are trophies (Trophies.lua).
 local function trophyFor(d)
     if #ns.db.deaths == 0 then return nil end
     local longest = 0
@@ -206,10 +191,6 @@ local function learnTarget()
     end
 end
 
--- The saved data's shape, so a later change can upgrade it. 1: names kept only for killers.
--- 2: every stream's start kept in a list, not only the latest. 3: the counter's layout by name.
--- 4: no "highest level yet" trophy. 5: every collected bounty a record of its own. 6: milestones are
--- trophies, not a card line; what friends did that trophies count is kept for good.
 local VERSION = 6
 local function upgrade(db)
     db.version = db.version or 0
@@ -254,7 +235,6 @@ end
 
 function ns.StreamStart() return ns.db.streams[#ns.db.streams] end
 
--- Which stream a moment falls in: its place in ns.db.streams, nil before the first.
 function ns.StreamOf(t)
     local starts = ns.db.streams
     for i = #starts, 1, -1 do
@@ -262,7 +242,6 @@ function ns.StreamOf(t)
     end
 end
 
--- The day a moment counts for in records, as "2026-11-03", on the player's clock.
 function ns.Day(t) return date("%Y-%m-%d", t) end
 
 function ns.DayNoon(day)
@@ -270,7 +249,6 @@ function ns.DayNoon(day)
     return time({ year = tonumber(y) or 1970, month = tonumber(m) or 1, day = tonumber(d) or 1, hour = 12 })
 end
 
--- Where today, this week (from Monday) and this month start.
 function ns.PeriodStart(period)
     local c = date("*t", time())
     local dayStart = time({ year = c.year, month = c.month, day = c.day, hour = 0 })
@@ -290,12 +268,7 @@ local function retiredAt(key)
     return at
 end
 
--- By NPC ID (mob names carry a random suffix on Forever); a tie keeps the mob that got there first.
--- A collected bounty retires the nemesis: only deaths after it count toward the next one. Returns
--- the mob, its name, all its kills and those since the bounty.
 ns.NEMESIS_KILLS = 3
--- Only the character's latest deaths in the open world choose it (not dungeons, raids, battlegrounds or
--- arenas); one that drops out escapes.
 ns.NEMESIS_WINDOW = 10
 local NOT_OPEN_WORLD = { party = true, raid = true, pvp = true, arena = true }
 function ns.Nemesis(f, least)
@@ -320,7 +293,6 @@ function ns.Nemesis(f, least)
             end
         end
     end
-    -- A tie keeps the current nemesis, also when its oldest kill leaves the window.
     local c = ns.db.characters[f.char]
     local current = c and c.nemesis
     if best and current and fresh[current] == fresh[best] then best = current end
@@ -329,7 +301,6 @@ function ns.Nemesis(f, least)
     end
 end
 
--- What a death's trophy was, from the saved deaths up to it: a label and its line.
 function ns.Trophy(d)
     local kills = 0
     for _, p in ipairs(ns.db.deaths) do
@@ -379,7 +350,6 @@ function ns.DeleteAllDeaths()
     changed()
 end
 
--- A deletion that ends a nemesis takes the kills paid on it along, as an escape does.
 function ns.DeleteDeath(d)
     for i = #ns.db.deaths, 1, -1 do
         if ns.db.deaths[i] == d then
@@ -415,7 +385,7 @@ local function record(at, e, events)
         learnPlayer(d, d.guid)
     end
     if d.guid then learnLevel(d, d.guid) end
-    d.guid = nil   -- a GUID only holds for this session
+    d.guid = nil
     d.char, d.name, d.time = charKey, char.name, at
     d.level, d.zone, d.subzone = UnitLevel("player"), GetRealZoneText(), GetSubZoneText()
     local _, instance = IsInInstance()
@@ -436,7 +406,6 @@ local function record(at, e, events)
         table.insert(ns.db.escapes, { char = charKey, npc = escaped, time = at })
         ns.db.payments[charKey .. "|" .. escaped] = nil
     end
-    -- Without a recap, the last one read stays the one to skip.
     if e then ns.db.lastRecap = recapID(e) end
     pending = false
     local function tell(kind)
@@ -448,11 +417,9 @@ local function record(at, e, events)
     if d.cause == "mob" and d.npc then ns.MobKind(d.npc, tell) else tell() end
 end
 
--- The recap can come late, or still hold the previous death: read it at 0.3 s, again at 1 s,
--- then count the death as unknown.
+-- The Death Recap can come late, or still hold the previous death.
 local RECAP_WAIT, RECAP_RETRY = 0.3, 0.7
--- The killing blow's timestamp is Unix time, within a second of PLAYER_DEAD (tested 2026-10-22): an
--- older one is an earlier death's recap, still there because this one's came late.
+-- The killing blow's timestamp is Unix time, within a second of PLAYER_DEAD.
 local RECAP_AGE = 5
 local function readRecap(at, last)
     local events = C_DeathRecap.HasRecapEvents() and C_DeathRecap.GetRecapEvents()
@@ -469,7 +436,7 @@ local function readRecap(at, last)
 end
 
 local function onDead()
-    -- One death per life: PLAYER_DEAD can fire again while dead (seen 5 s later).
+    -- PLAYER_DEAD can fire again while dead.
     if not ready or pending or UnitIsFeignDeath("player") then return end
     local at = time()
     ready, pending = false, true
@@ -477,8 +444,8 @@ local function onDead()
     C_Timer.After(RECAP_WAIT, function() readRecap(at, false) end)
 end
 
--- Forever's realm name can come back empty (GetRealmName() too): the character keeps the realm it was
--- last seen on. Forever refuses a name taken on the other ruleset, so a name is one character.
+-- Forever's realm name can come back empty (GetRealmName() too). Forever refuses a name taken on
+-- the other ruleset, so a name is one character.
 local function realmOf(name)
     local realm = GetNormalizedRealmName()
     if realm and realm ~= "" then
@@ -493,7 +460,6 @@ local function realmOf(name)
     return ""
 end
 
--- What was saved while the realm was unknown moves to the character's full key.
 local function adopt(from, to)
     local old, new = ns.db.characters[from], ns.db.characters[to]
     ns.db.characters[from] = nil
@@ -522,7 +488,6 @@ local function adopt(from, to)
     end
 end
 
--- Every character saved without a realm, once one with its name has a realm.
 local function adoptAll()
     for key, c in pairs(ns.db.characters) do
         if c.name and key == c.name .. "-" then
@@ -543,9 +508,7 @@ local function onEnterWorld()
     adoptAll()
     char.name, char.level, char.faction = name, UnitLevel("player"), UnitFactionGroup("player")
     char.class = select(2, UnitClass("player"))
-    -- Logged in dead: that death was already counted.
     ready = not UnitIsDeadOrGhost("player")
-    -- Every loading screen fires this; only a login starts the clock, and only alive.
     if ready then sessionStart = sessionStart or time() end
 end
 
@@ -590,7 +553,7 @@ events:SetScript("OnEvent", function(_, event, ...)
         events:UnregisterEvent("ADDON_LOADED")
     elseif event == "PLAYER_ENTERING_WORLD" then
         onEnterWorld()
-        -- Once per UI load (a login or a /reload); every loading screen fires this too.
+        -- PLAYER_ENTERING_WORLD fires on every loading screen, not only once per UI load.
         if not entered then
             entered = true
             sendStatus()
@@ -619,8 +582,6 @@ function ns.OnEvent(event, fn)
     events:RegisterEvent(event)
 end
 
--- What its bounty costs: one kill for a rare, an elite or a boss (its rank from when it last killed
--- you), else the kills it made, at most 3. Returns kills left, kills owed.
 local PAY_ONCE = { elite = true, rare = true, rareelite = true, worldboss = true }
 ns.BOUNTY_MOST = 3
 function ns.BountyLeft(key, npc)
@@ -630,8 +591,6 @@ function ns.BountyLeft(key, npc)
     return owed - (ns.db.payments[key .. "|" .. npc] or 0), owed
 end
 
--- You or your party killed your nemesis: a kill toward its bounty; the last one retires it. Listeners
--- hear it first, while it still counts as the nemesis.
 ns.OnEvent("PARTY_KILL", function(_, target)
     if issecretvalue(target) or not charKey then return end
     local _, npc = ns.ParseGUID(target)

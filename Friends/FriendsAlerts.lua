@@ -1,17 +1,15 @@
--- How loud friends' news is: a small popup or a smaller death card for a friend's death (the
--- "When a friend dies" setting), a small popup for what's aimed at you, a chat line for the rest.
 local _, ns = ...
 local UI, F, L = ns.UI, ns.Friends, ns.FriendsLink
 local FA = {}
 ns.FriendsAlerts = FA
 
-FA.FRESH = 60          -- a death older than this (logged out, caught up later) never pops up
-FA.MERGE = 10          -- deaths this close together share one popup
-FA.QUIET = 30         -- one popup per this many seconds; the rest go to chat
+FA.FRESH = 60
+FA.MERGE = 10
+FA.QUIET = 30
 FA.HOLD = 5
 FA.MILESTONE = 50
-FA.AWAY_WAIT = 5       -- records catching up at login: one line once they've stopped coming
-FA.MANY = 4            -- this many friends in one popup: "Morwenna and 3 friends"
+FA.AWAY_WAIT = 5
+FA.MANY = 4
 FA.SOUND = 165950      -- SOUNDKIT.UI_ADVENTURES_DEATH_FRIENDLY
 
 local SMALL, SMALL_BUTTON, SMALL_MAX, CARD, CARD_MAX, PAD, CLOSE = 420, 580, 700, 480, 620, 16, 34
@@ -129,8 +127,6 @@ local function arrange(card, gold, icon)
     end
 end
 
--- line1, line2 for the small popup; targets: whose death "Pay respects" answers; gold: a rare edge;
--- icon: a texture beside the lines; quip: a death's joke under them.
 ---@param targets table?
 ---@param icon string?
 ---@param quip string?
@@ -145,10 +141,8 @@ function FA.Small(line1, line2, targets, gold, icon, quip)
     pop()
 end
 
--- A friend's name in the class color of the character they play now (text color while it's unknown).
 function FA.ClassName(id) return UI.Colored(F.Name(id), UI.ClassColor(F.Known(id).class) or UI.COLOR.text) end
 
--- "Kaelthorn paid respects / Your death #48 to Rocklance, Melee, The Barrens"; d is one of your deaths.
 ---@param number number? which death, as friends were sent it; counted when left out
 function FA.PaidRespects(name, d, number)
     number = number or F.DeathNumber(d)
@@ -173,11 +167,6 @@ function FA.Card(kind, titleColor, title, detail, targets, gold, quip)
     parts.detail:SetText(detail)
     arrange(true, gold)
     pop()
-end
-
-local function inGroup(id)
-    local char = F.Known(id).char
-    return char ~= nil and (UnitInParty(char) or UnitInRaid(char)) and true or false
 end
 
 local function deathLine(id, l)
@@ -223,7 +212,7 @@ local function friendDied(id, l)
             UI.CauseColor(F.Cause(l)), l.killer, cardDetail(l), targets, rare, l.joke)
     end
     FA.Small(F.Name(id) .. UI.Muted(" died to ") .. UI.KillerName(l.killer, F.Cause(l)),
-        UI.Join(l.char, l.spell, l.zone, l.number and "death #" .. l.number), targets, nil, FA.DEATH_ICON, l.joke)
+        UI.Join(UI.CharName(l.char), l.spell, l.zone, l.number and "death #" .. l.number), targets, nil, FA.DEATH_ICON, l.joke)
 end
 
 local function newNemesis(id, c, l)
@@ -256,7 +245,6 @@ local function caughtUp(id, n)
     C_Timer.After(FA.AWAY_WAIT, awayLine)
 end
 
--- For the demo: the next popup shows even right after the last.
 function FA.ResetQuiet() lastPopup, merged = -math.huge, nil end
 
 function FA.OnRecord(rec, changes)
@@ -269,7 +257,7 @@ function FA.OnRecord(rec, changes)
             ns.Trophies.Fact("friendDeath", { id = id, killer = l.killer, npc = l.npc, time = l.time })
             if time() - l.time > FA.FRESH then
                 caughtUp(id, c.deaths - (c.before or c.deaths - 1))
-            elseif ns.db.settings.friendDeath ~= "off" and not inGroup(id) and not ns.InBattle() then
+            elseif ns.db.settings.friendDeath ~= "off" and not F.InGroup(id) and not ns.InBattle() then
                 F.WhenFree(function()
                     if nemesis then return newNemesis(id, nemesis, l) end
                     friendDied(id, l)
@@ -282,8 +270,6 @@ function FA.OnRecord(rec, changes)
 end
 L.On("record", FA.OnRecord)
 
--- Killing a friend's nemesis: they're told, hidden; their screens say you avenged them.
--- Only your own kill avenges, and only a friend outside your group: a groupmate's kill pays the bounty.
 ns.OnEvent("PARTY_KILL", function(attacker, target)
     if issecretvalue(target) or issecretvalue(attacker) or attacker ~= UnitGUID("player") then return end
     local _, npc = ns.ParseGUID(target)
@@ -291,7 +277,7 @@ ns.OnEvent("PARTY_KILL", function(attacker, target)
     for _, id in ipairs(F.NemesisOf(npc)) do
         local rec = F.Store().players[id]
         local zone = GetRealZoneText() or ""
-        if not inGroup(id) then
+        if not F.InGroup(id) then
             L.SendTo(id, ("G^%s^%d^%s"):format(F.Me(), npc, zone:gsub("%^", "")), function()
                 local mob = F.Char(rec, F.Known(id).char).nemName
                 F.AddEvent({ kind = "avengedBy", id = id, mob = mob, npc = npc, zone = zone })
@@ -306,7 +292,7 @@ end)
 
 L.On("G", function(id, p)
     local npc, name = ns.CharacterNemesis()
-    if not npc or npc ~= tonumber(p[3]) or ns.InBattle() or inGroup(id) then return end
+    if not npc or npc ~= tonumber(p[3]) or ns.InBattle() or F.InGroup(id) then return end
     F.AddEvent({ kind = "avenged", id = id, mob = name, npc = npc, zone = p[4] })
     FA.Small(F.Name(id) .. " " .. UI.Colored("avenged you", UI.COLOR.trophy),
         UI.Muted("Killed ") .. UI.MobName(name) .. UI.Muted(", your nemesis. Its bounty is still yours."), nil, true)

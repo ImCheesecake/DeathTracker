@@ -1,12 +1,10 @@
--- What a death cost, saved with it once the player is alive again: the time as a ghost, the yards run back,
--- the repair bill (the durability lost to the death and the resurrection) and how you came back.
 local _, ns = ...
 
 local SAMPLE_SECONDS = 1
 -- The server's resurrection counters: priests, Rebirth, Revive, shamans, paladins, soulstones.
 local REZ_STATS = { 796, 798, 1229, 799, 800, 801 }
-local TELEPORT = 60     -- yards in one step: a teleport, not running
-local MOVED = 1         -- yards in one step: running, not standing still
+local TELEPORT = 60     -- yards in one tick
+local MOVED = 1
 local cost
 local stale = true
 
@@ -26,7 +24,6 @@ local function repairCost()
     return total
 end
 
--- The death being followed, saved per character so a /reload or a logout as a ghost keeps it.
 local function current()
     local key = ns.CharacterKey()
     return key and ns.db.runs[key], key
@@ -41,7 +38,7 @@ local function risen(before)
     return #up > 0 and up or nil
 end
 
-local finishing = {}   -- runs waiting to be written; not saved, so a /reload finishes them again
+local finishing = {}
 local DUNGEON = { party = true, raid = true }
 
 -- A ghost walking into a dungeon's portal comes back alive with no call to hook.
@@ -55,7 +52,7 @@ local function finish()
     if not run or finishing[run] then return end
     finishing[run] = true
     walkedIn(run)
-    -- The resurrection's durability loss arrives just after it. The run stays saved until then.
+    -- The resurrection's durability loss arrives just after it.
     C_Timer.After(2, function()
         finishing[run] = nil
         walkedIn(run)
@@ -80,7 +77,6 @@ local function tick()
     if stale and not UnitIsDeadOrGhost("player") then cost, stale = repairCost(), false end
     local run = current()
     if not (run and UnitIsGhost("player")) then return end
-    -- By the clock, so a late tick still counts; a longer gap is time logged out.
     local now = time()
     local gap = run.at and now - run.at
     if gap and gap <= 5 then run.ghost = run.ghost + gap end
@@ -95,7 +91,6 @@ local function tick()
         local step = math.sqrt((x - run.x) ^ 2 + (y - run.y) ^ 2)
         if step < TELEPORT then
             run.yards = run.yards + step
-            -- The seconds spent running, so the run back reads as time at any speed the player has.
             if step >= MOVED and gap and gap <= 5 then run.running = (run.running or 0) + gap end
         end
     end
@@ -134,7 +129,7 @@ hooksecurefunc(C_PlayerInteractionManager, "ConfirmationInteraction", function(k
 end)
 hooksecurefunc("AcceptAreaSpiritHeal", function() cameBack({ how = "healer" }) end)
 hooksecurefunc("RetrieveCorpse", function() cameBack({ how = "corpse" }) end)
--- PLAYER_ALIVE also fires on releasing as a ghost; alive and not a ghost: rezzed at the body.
+-- PLAYER_ALIVE also fires on releasing as a ghost.
 ns.OnEvent("PLAYER_ALIVE", function()
     if not UnitIsGhost("player") then return finish() end
     local run = current()

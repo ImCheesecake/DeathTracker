@@ -1,4 +1,3 @@
--- The history window's Deaths page: the totals, and every death grouped by day, newest first.
 local _, ns = ...
 local UI = ns.UI
 local Shell = ns.HistoryShell
@@ -70,7 +69,7 @@ local function fillDeath(row, item)
     if f.char or f.name then
         row.how:SetText(how)
     else
-        row.how:SetText(UI.Named(d.name, how ~= "" and (how:gsub("^Fell", "fell")) or nil))
+        row.how:SetText(UI.Named(UI.CharName(d.name), how ~= "" and (how:gsub("^Fell", "fell")) or nil))
     end
     row.time:SetText(date("%H:%M", d.time))
     row.repair:SetText(d.repair and UI.Money(d.repair) or "")
@@ -96,8 +95,6 @@ local function deathColor(d)
     return d.cause == "player" and UI.ClassColor(d.killerClassFile) or UI.CauseColor(d.cause)
 end
 
--- What the row doesn't say already; deaths from older versions have fewer lines. of, whom: whose
--- death (a friend's id, their name), open: its details are showing.
 local function deathTipFor(row, d, of, whom, open)
     local lines = {}
     local function add(text) if text then lines[#lines + 1] = text end end
@@ -126,7 +123,6 @@ local function deathTip(row, item)
     deathTipFor(row, item.death, Shell.Friend(), Shell.Whom(), deathPicked(item.death))
 end
 
--- whom: "you", or a friend's character.
 local function levelLine(d, whom)
     local line = Shell.KillerLine(d)
     local gap = d.killerLevel and d.killerLevel > 0 and d.level and d.killerLevel - d.level
@@ -138,7 +134,7 @@ end
 
 local function whereLine(d)
     local where = d.subzone and d.subzone ~= "" and d.subzone or d.zone or "?"
-    local verb = d.killer and ("Killed %s in %s"):format(d.name, where) or ("%s died in %s"):format(d.name, where)
+    local verb = d.killer and ("Killed %s in %s"):format(UI.CharName(d.name), where) or ("%s died in %s"):format(UI.CharName(d.name), where)
     return verb .. ", " .. UI.At(d.time, true)
 end
 
@@ -170,7 +166,6 @@ local function hitNote(fight, i)
     return note
 end
 
--- why: the line under it, on why the hits are missing.
 local function killingBlow(panel, d, why)
     panel:Label("Killing blow")
     local fall = d.cause == "fall"
@@ -181,11 +176,9 @@ local function killingBlow(panel, d, why)
     panel:Line(why, "faint")
 end
 
--- The fight's numbers and its last hits, or the killing blow alone for a death saved before the hits were.
 local function fightPart(panel, d, whose, why)
     local fight = H.Fight(d)
     local stats = fightStats(d, fight)
-    -- One number alone repeats the hit below it.
     if stats and #stats > 1 then panel:Stats(stats) end
     if fight then
         panel:Label(("Last hits, with %s health after each"):format(whose))
@@ -199,9 +192,6 @@ local function fightPart(panel, d, whose, why)
     end
 end
 
--- The recap of one death: who and where, the fight's numbers, its last hits, what it cost. sel.of: a
--- friend's death opened from Recent, outside the list (sel.logged: one of the deaths they sent, as is);
--- sel.mine: one of yours, opened from there too.
 local function deathDetails(panel, sel)
     if sel.kind ~= "death" then return false end
     local d, theirs = sel.death, sel.of or not sel.mine and Shell.Friend()
@@ -213,7 +203,7 @@ local function deathDetails(panel, sel)
         if not listed then return false end
     end
     panel:Title(ns.DeathTitle(d), UI.CauseColor(d.cause))
-    local who = levelLine(d, theirs and d.name or "you")
+    local who = levelLine(d, theirs and UI.CharName(d.name) or "you")
     if who then panel:Line(who, "white") end
     panel:Line(whereLine(d))
     if d.joke then panel:Quip(d.joke) end
@@ -264,7 +254,7 @@ local function buildDeaths(content)
                 local word = Shell.TimeWord()
                 return ("The longest %s played without dying%s."):format(Shell.Whom(), word and " " .. word or "")
             end
-            local text = ("The longest %s played without dying, on the characters shown. %s"):format(Shell.Whom(), l.name)
+            local text = ("The longest %s played without dying, on the characters shown. %s"):format(Shell.Whom(), UI.CharName(l.name))
             if l.what and l.time then text = ("%s, before %s %s"):format(text, l.what, UI.At(l.time)) end
             return text .. "."
         end),
@@ -296,7 +286,6 @@ local function placeTotals()
     end
 end
 
--- A death opened from a record or a trophy is scrolled to, once.
 local function showDeaths(items)
     parts.deaths.Set(items)
     local sel = Shell.Selected()
@@ -320,11 +309,10 @@ local function refreshDeaths(deaths)
     if longest then life = { value = longest.alive, name = longest.name, what = ns.DeathTitle(longest), time = longest.time } end
     local id, name = Shell.Friend()
     local repairText, ghostText = UI.Money(repair), UI.Duration(ghost)
-    -- A friend on 1.4.x sends their totals, a few periods' deaths and longest life, and only their
-    -- newest deaths: what it doesn't send stays blank.
+    -- A friend on 1.4.x sends only totals, a few periods and their newest deaths: the rest stays blank.
     if id and ns.Friends.Partial(id) then
         local F = ns.Friends
-        local rec = F.Store().players[id]
+        local rec = F.Record(id)
         local c = name and F.Char(rec, name)
         local of, top, period = c or rec, c or F.Char(rec, rec.longestChar), Shell.Period()
         repairText, ghostText, life = "", "", nil
@@ -349,7 +337,7 @@ local function refreshDeaths(deaths)
         local F, text = ns.Friends, nil
         if not F.SendsDeaths(id) then
             text = ("%s is on an older Death Tracker: only their newest %d deaths show."):format(F.Name(id), F.SENT_DEATHS)
-        elseif ns.FriendsLink.Online(id) then
+        elseif ns.FriendsLink.Online(F.Current(id)) then
             text = ("Getting %s's deaths…"):format(F.Name(id))
         else
             text = ("%s's deaths arrive the next time you're both online."):format(F.Name(id))

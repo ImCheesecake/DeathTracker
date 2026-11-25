@@ -1,5 +1,3 @@
--- The monthly recap: last month on all your characters as short slides, offered
--- once by a chat line at the first login after the month ends, and from Records.
 local addonName, ns = ...
 local UI, H = ns.UI, ns.History
 local R = {}
@@ -9,7 +7,7 @@ local SAY_AFTER = 8
 local MOST_ROWS = 5
 local HIDE_AFTER = 3 * 86400
 local MUSIC_SECONDS = 41.3
--- Riding at 40 with a basic mount included; riding at 60 plus a swift mount (docs/research/vendor-prices-2026-11-17.md).
+-- Riding in copper: at 40 a basic mount, at 60 a swift one.
 local FIRST_MOUNT, EPIC_MOUNT = 100 * 10000, 1200 * 10000
 
 local function recapStore()
@@ -18,7 +16,6 @@ local function recapStore()
     return ns.db.recap
 end
 
--- A month's key, "2026-12".
 function R.Key(t) return date("%Y-%m", t) end
 
 function R.Bounds(key)
@@ -37,7 +34,6 @@ function R.Played(key)
     return recapStore().played[key] or #ns.Deaths({ from = from, to = to }, 1) > 0
 end
 
--- The last month that's over, if you played in it.
 function R.Last()
     local key = R.Before(R.Key(time()))
     return R.Played(key) and key or nil
@@ -63,7 +59,6 @@ local function worstDay(m, deaths)
     if killer and killer.kills >= 2 then w.killer, w.killerKills = UI.KillerName(killer.name, killer.cause), killer.kills end
 end
 
--- Everything the slides say about one month.
 function R.Month(key)
     local from, to = R.Bounds(key)
     local f = { from = from, to = to }
@@ -83,8 +78,6 @@ function R.Month(key)
     return R.Fill(m, f, deaths)
 end
 
--- What any recap says over these deaths: the nemesis, the worst zone, time dead, the repair bills and
--- the longest life. m.characters must be set.
 function R.Fill(m, f, deaths)
     local mob = H.Mobs(f)[1]
     if mob and mob.kills >= 2 then
@@ -155,7 +148,7 @@ local function charactersSlide(m)
     local rows, rest, restDeaths = {}, 0, 0
     for k, c in ipairs(m.characters) do
         if k <= MOST_ROWS then
-            local name = UI.Colored(c.name, R.ClassColor(c.key)) .. (c.level and UI.Colored(" level " .. c.level, UI.COLOR.faint) or "")
+            local name = UI.Colored(UI.CharName(c.name), R.ClassColor(c.key)) .. (c.level and UI.Colored(" level " .. c.level, UI.COLOR.faint) or "")
             rows[k] = { name = name, value = c.deaths, tint = k == 1 }
         else
             rest, restDeaths = rest + 1, restDeaths + c.deaths
@@ -188,12 +181,14 @@ function R.MountLine(copper)
     return ("That's %d%% of %s."):format(share, mount)
 end
 
+local COST_SIZE = 50
+
 function R.CostSlide(m)
     local lines = { { text = ("spent on repairs %s."):format(m.during) } }
     if m.bills > 1 then
         lines[2] = { text = ("The worst bill: %s, to %s."):format(UI.Money(m.bill.repair), R.CausedBy(m.bill)) }
     end
-    return { label = "THE COST", title = UI.Money(m.repair), titleSize = 50, lines = lines, roast = R.MountLine(m.repair) }
+    return { label = "THE COST", title = UI.BigMoney(m.repair, COST_SIZE), titleSize = COST_SIZE, lines = lines, roast = R.MountLine(m.repair) }
 end
 
 function R.NemesisSlide(m)
@@ -206,7 +201,6 @@ function R.NemesisSlide(m)
         roast = R.Roast("nemesis", { killer = UI.MobName(n.name), kills = n.kills }) }
 end
 
--- The last slide, made to screenshot: the count in the corner and each { label, value } that has a value.
 function R.Summary(m, label, title, titleColor, entries)
     local grid = {}
     for _, e in ipairs(entries) do if e[2] then grid[#grid + 1] = { label = e[1], value = e[2] } end end
@@ -271,7 +265,6 @@ end
 local show, play
 function R.PlayLabel(key) return ("Play %s recap"):format(R.Name(key)) end
 
--- Records offers the last month that's over until a few days after it was played.
 function R.Offer()
     local key = R.Last()
     local played = key and recapStore().watched and recapStore().watched[key]
@@ -279,7 +272,7 @@ function R.Offer()
     return key
 end
 
--- PlayMusic repeats a file after a pause; the song plays once, then the zone's music comes back.
+-- PlayMusic repeats a file after a pause.
 local tune = 0
 local function stopMusic()
     tune = tune + 1

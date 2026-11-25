@@ -1,5 +1,3 @@
--- Turns the Death Recap's killing blow into a cause: fall, drown, mob, player and so on, with the
--- killer, its NPC ID, the spell and how it hit; and keeps the last hits of the fight.
 local _, ns = ...
 
 local ENVIRONMENT = { FALLING = "fall", DROWNING = "drown", FATIGUE = "fatigue", FIRE = "fire",
@@ -7,20 +5,18 @@ local ENVIRONMENT = { FALLING = "fall", DROWNING = "drown", FATIGUE = "fatigue",
 
 local FLAG = Enum.CombatLogObject
 
--- A secret value errors when compared, so every field goes through this first.
+-- A secret value errors when compared.
 function ns.Readable(v)
     if v == nil or issecretvalue(v) then return nil end
     return v
 end
 local open = ns.Readable
 
--- A server statistic as a number: its text is "--" for none yet, a large count with commas.
+-- GetStatistic's text is "--" for none yet, and a large count has commas.
 function ns.Statistic(id) return tonumber((tostring(open(GetStatistic(id)) or ""):gsub("%D", ""))) or 0 end
 
 local function has(flags, mask) return bit.band(flags, mask) ~= 0 end
 
--- "Creature-0-6849-0-7-1554-00005923BB": the kind is the first word, the NPC ID the sixth.
--- Forever scrambles the server and spawn parts, not the NPC ID.
 local function parseGUID(guid)
     if not guid then return nil end
     local kind, _, _, _, _, id = strsplit("-", guid)
@@ -28,9 +24,7 @@ local function parseGUID(guid)
 end
 ns.ParseGUID = parseGUID
 
--- The hits of the fight that killed you, newest first, from the Death Recap's events (newest first too).
--- A fight ends at a gap of FIGHT_GAP seconds without damage, so an earlier pull is left out.
--- hp: your health as the recap gives it with the hit; amount: what landed, the overkill taken off.
+-- The Death Recap's events come newest first.
 ns.FIGHT_GAP = 5
 function ns.RecapHits(events)
     local hits, last, death = {}, nil, nil
@@ -69,8 +63,7 @@ function ns.Classify(e, myGUID)
     elseif guid and guid == myGUID then
         c.cause = "self"
     elseif flags then
-        -- The flags are the surest: a hunter's pet is player-controlled, a mob's pet isn't. A totem or
-        -- guardian counts as a pet, as Blizzard's own combat log filter has it (COMBATLOG_FILTER_MY_PET).
+        -- A hunter's pet is player-controlled, a mob's pet isn't; Blizzard counts totems and guardians as pets.
         if has(flags, FLAG.ControlPlayer) then
             c.cause, c.pet, c.guid = "player", (has(flags, FLAG.TypePet) or has(flags, FLAG.TypeGuardian)) or nil, guid
         elseif has(flags, FLAG.TypeObject) or kind == "GameObject" then

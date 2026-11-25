@@ -1,12 +1,9 @@
--- The history window's numbers, worked out from the saved deaths: the Deaths list (Core's filter),
--- killers, zones, records and a row per character. No frames here; the window draws these.
 local _, ns = ...
 local H = {}
 ns.History = H
 
 H.Deaths, H.Causes = ns.Deaths, ns.CauseCounts
 
--- Deaths grouped by keyOf(d) (nil leaves a death out), groups in the order first seen.
 local function group(deaths, keyOf)
     local byKey, out = {}, {}
     for _, d in ipairs(deaths) do
@@ -22,7 +19,6 @@ local function group(deaths, keyOf)
     return out
 end
 
--- A tie keeps the value seen first: deaths come newest first, so the latest.
 local function ranked(deaths, valueOf)
     local n, first, out = {}, {}, {}
     for _, d in ipairs(deaths) do
@@ -41,7 +37,6 @@ end
 
 local function most(deaths, valueOf) return (ranked(deaths, valueOf))[1] end
 
--- The value most deaths share, and how many share it.
 function H.Most(deaths, valueOf)
     local values, n = ranked(deaths, valueOf)
     return values[1], values[1] and n[values[1]] or 0
@@ -53,7 +48,6 @@ local function placeOf(d) return d.subzone and d.subzone ~= "" and d.subzone or 
 -- A pet's kill is left out: its owner isn't known.
 local function playerOf(d) return d.cause == "player" and not d.pet and d.killer or nil end
 
--- Most first; a tie goes to the latest.
 local function byMost(list, field)
     table.sort(list, function(a, b)
         if a[field] ~= b[field] then return a[field] > b[field] end
@@ -95,7 +89,6 @@ function H.KillsOn(deaths)
     return out
 end
 
--- Who killed you: a mob by the game's name, a player by name; a pet's kill and a fall have none.
 local function killerOf(d)
     if d.cause == "mob" and d.npc then return ns.db.npcNames[d.npc] or d.killer end
     return playerOf(d)
@@ -124,7 +117,6 @@ function H.Zones(f)
     return byMost(out, "deaths")
 end
 
--- A spot is a subzone; a death with none isn't in one.
 function H.Spots(f)
     local out = {}
     local keyOf = function(d) return d.subzone and d.subzone ~= "" and d.zone .. "|" .. d.subzone or nil end
@@ -147,7 +139,6 @@ local function lowest(oldestFirst, valueOf)
     return best and { death = best, value = bestValue }
 end
 
--- The death with the highest value; a tie keeps the earliest, which set the record first.
 local function highest(oldestFirst, valueOf)
     local best, bestValue
     for _, d in ipairs(oldestFirst) do
@@ -157,8 +148,6 @@ local function highest(oldestFirst, valueOf)
     return best and { death = best, value = bestValue }
 end
 
--- Every record over the deaths the filter keeps. A stream runs from its start to the next one; the
--- fewest waits for a stream to be over.
 function H.Records(f)
     local deaths = H.Deaths(f)
     local oldestFirst = {}
@@ -180,8 +169,6 @@ function H.Records(f)
             r.mostInHour = { deaths = i - first + 1, from = oldestFirst[first].time, to = oldestFirst[first].time + HOUR }
         end
     end
-    -- Without dying means any death on the characters and time kept, whatever the cause or level
-    -- filters pick; the time since the last death is a stretch too, still going.
     local every = {}
     for _, d in ipairs(H.Deaths({ char = f.char, name = f.name, of = f.of, ruleset = f.ruleset, since = f.since, stream = f.stream })) do table.insert(every, 1, d) end
     local last = every[#every]
@@ -219,7 +206,6 @@ function H.Records(f)
     return r
 end
 
--- Who killed you most over these deaths: { name, cause, kills }, most first, at most n.
 function H.TopKillers(deaths, n)
     local names, kills = ranked(deaths, killerOf)
     local cause = {}
@@ -232,7 +218,6 @@ function H.TopKillers(deaths, n)
     return out
 end
 
--- Blizzard's own icons for what isn't a spell (Blizzard_DeathRecap's GetEventInfo).
 local ENV_ICONS = { DROWNING = "spell_shadow_demonbreath", FALLING = "ability_rogue_quickrecovery", FIRE = "spell_fire_fire",
     LAVA = "spell_fire_fire", SLIME = "inv_misc_slime_01", FATIGUE = "ability_creature_cursed_05" }
 H.ENV_ICONS = ENV_ICONS
@@ -253,12 +238,10 @@ function H.HitName(h)
     return h.spell or "Melee"
 end
 
--- Who dealt a hit: a mob by the game's own name (the recap's carries a random word).
+-- The recap's mob names carry a random word; the game's own name has none.
 function H.HitSource(h) return h.npc and ns.db.npcNames[h.npc] or h.source end
 
--- The last hits of the fight that killed you, each with the health it left (the bar), and the whole fight's
--- numbers: how long it took, the damage that landed, the attackers. The recap's health is yours when the
--- hit came in.
+-- The recap's health is yours when the hit came in.
 ns.MOST_HITS = 5
 function H.Fight(d)
     local hits = d.hits
@@ -268,7 +251,7 @@ function H.Fight(d)
     local seen = {}
     for i, h in ipairs(hits) do
         f.damage = f.damage + (h.amount or 0)
-        -- A fall, drowning or hidden caster has no source: not an attacker.
+        -- A fall, drowning or hidden caster has no source.
         local who = H.HitSource(h)
         if who and not seen[who] then seen[who], f.attackers = true, f.attackers + 1 end
         if i <= ns.MOST_HITS then
@@ -277,15 +260,14 @@ function H.Fight(d)
                 part = left and most and math.min(1, left / most) or nil }
         end
     end
-    -- A friend's death carries only the hits listed, and the whole fight's numbers beside them.
+    -- A friend's death carries only the hits listed, with the whole fight's numbers in sum.
     local sum = d.sum
     if sum then f.damage, f.deadIn, f.attackers = sum.damage, sum.deadIn, sum.attackers end
     f.several = f.attackers > 1
     return f
 end
 
--- A killer's hits on you over its deaths: each spell once, how often it hit and its biggest. Deaths saved
--- before the recap's hits were kept give their killing blow.
+-- Deaths saved before hits were kept have only their killing blow.
 function H.KillerHits(deaths, isKiller)
     local bySpell, out = {}, {}
     local function addSpell(name, icon, amount)

@@ -1,5 +1,3 @@
--- Trophies (docs/trophies.md): each is checked over everything that happened, in time order. A step,
--- once earned, is kept with what earned it, unless that death is deleted.
 local _, ns = ...
 local UI = ns.UI
 local T = {}
@@ -10,7 +8,7 @@ T.GROUPS = { { "general", "General" }, { "causes", "Causes" }, { "killers", "Kil
     { "streams", "Streams" }, { "friends", "Friends" } }
 
 local HOUR, GOLD, MILE = 3600, 10000, 1760
-T.FRESH = 120          -- earned by something older than this (the first run, a deleted death): no popup
+T.FRESH = 120
 T.SIDE_BY_SIDE = 10
 T.ONE_FIGHT = 30
 local HOGGER = 448
@@ -18,8 +16,6 @@ local HOGGER = 448
 local defs, byId = {}, {}
 T.defs = defs
 
--- t: names (one, or one per step), line(n) for a step's goal n, at (the steps, 1 by default),
--- step(s, e) raising s.n, hidden, parts ({ key, label }: a collection), show(n, goal), unit(n).
 local function addTrophy(group, id, t)
     t.group, t.id = group, id
     t.at = t.at or { 1 }
@@ -51,7 +47,6 @@ local function collectParts(parts, key)
         return valid[k] and k or nil
     end)
 end
--- The most deaths sharing one key.
 local function mostOf(key)
     return function(s, e)
         if e.kind ~= "death" then return end
@@ -72,14 +67,13 @@ local function playerKill(d) return d.cause == "player" and not d.pet end
 local function faction(d) local c = ns.db.characters[d.char] return c and c.faction end
 local function class(d) local c = ns.db.characters[d.char] return c and c.class end
 
--- Streams count only while Streamer.bot is on: without it, the one start saved is the install.
+-- Without Streamer.bot on, the one stream start saved is the install.
 local function streamStartOf(t) return ns.Streaming() and ns.db.streams[ns.StreamOf(t) or 0] or nil end
 
 local CLASSES = { { "DRUID" }, { "HUNTER" }, { "MAGE" }, { "PALADIN" }, { "PRIEST" }, { "ROGUE" }, { "SHAMAN" },
     { "WARLOCK" }, { "WARRIOR" } }
 for _, c in ipairs(CLASSES) do c[2] = function() return UI.ClassName(c[1]) end end
 
----------------------------------------------------------------- General
 addTrophy("general", "deaths", { names = { "First of Many", "Graveyard Regular", "Familiar Face", "Triple Digits",
     "Still Going", "Hard Lessons", "Slow Learner" }, at = { 1, 10, 50, 100, 250, 500, 1000 },
     line = function(n) return n == 1 and "Die once." or ("Die %s times."):format(BreakUpLargeNumbers(n)) end,
@@ -131,7 +125,6 @@ end
 addTrophy("general", "leetClock", { names = "Leet O'Clock", hidden = true, line = "Die at 13:37.",
     step = deathIs(function(d) local c = clock(d.time) return c.hour == 13 and c.min == 37 end) })
 
----------------------------------------------------------------- Causes
 for _, c in ipairs({ { "fall", "Gravity Wins", "Die from a fall." }, { "drown", "Out of Breath", "Drown." },
     { "fatigue", "Too Far Out", "Swim out until fatigue gets you." }, { "fire", "Burned", "Die to fire." },
     { "lava", "Into the Lava", "Die in lava." }, { "slime", "Slime Time", "Die in slime." }, { "self", "Own Goal", "Die to your own spell." } }) do
@@ -163,7 +156,6 @@ addTrophy("causes", "lit", { names = "Lit", hidden = true, line = "Die to fire a
 addTrophy("causes", "niceHit", { names = "Nice Hit", hidden = true, line = "Die to a hit of exactly 69.", step = deathIs(function(d) return d.amount == 69 end) })
 addTrophy("causes", "leetHit", { names = "Leet Hit", hidden = true, line = "Die to a hit of exactly 1,337.", step = deathIs(function(d) return d.amount == 1337 end) })
 
----------------------------------------------------------------- Killers
 addTrophy("killers", "personal", { names = { "It's Personal", "Old Enemies", "Sworn Enemies", "Archenemies" }, at = { 3, 5, 10, 25 },
     line = function(n) return ("Get killed by the same mob %d times."):format(n) end, unit = function(n) return UI.Count(n, "kill", "kills") end,
     step = mostOf(function(d) return d.npc end) })
@@ -219,11 +211,9 @@ addTrophy("killers", "family", { names = "Runs in the Family", line = "Get kille
         end
     end })
 
----------------------------------------------------------------- Dungeons & Raids
 addTrophy("dungeons", "dungeon", { names = "Dungeon Crawler", line = "Die in a dungeon or raid.",
     step = deathIs(function(d) return d.instance == "party" or d.instance == "raid" end) })
 
----------------------------------------------------------------- Player vs. Player
 addTrophy("pvp", "firstBlood", { names = "First Blood, Yours", line = "Get killed by a player.", step = deathIs(function(d) return d.cause == "player" end) })
 addTrophy("pvp", "goodBoy", { names = "Who's a Good Boy", line = "Get killed by a player's pet.",
     step = deathIs(function(d) return d.cause == "player" and d.pet end) })
@@ -257,7 +247,6 @@ addTrophy("pvp", "everyClass", { names = "Every Class", line = "Get killed by a 
 addTrophy("pvp", "bullied", { names = "Bullied", line = "Get killed by a player 10 or more levels above you.",
     step = deathIs(function(d) return playerKill(d) and (d.killerLevel or 0) > 0 and d.level and d.killerLevel >= d.level + 10 end) })
 
----------------------------------------------------------------- Resurrection
 local function runSeconds(d) return d.runSecs or (d.ran and d.ran / UI.GHOST_SPEED) end
 local function miles(n) return n / MILE end
 local function milesText(n) local m = miles(n) return m < 10 and ("%.1f"):format(m) or BreakUpLargeNumbers(math.floor(m)) end
@@ -297,7 +286,6 @@ addTrophy("resurrection", "proclaimed", { names = { "Proclaimed Dead", "Encore" 
     unit = function(n) return BreakUpLargeNumbers(miles(n)) .. " miles" end,
     show = function(n, goal) return ("%s / %s miles"):format(milesText(n), milesText(goal)) end, step = sum("ran") })
 
----------------------------------------------------------------- Streams
 local function inStream(key)
     return function(d)
         local start = streamStartOf(d.time)
@@ -324,7 +312,6 @@ addTrophy("streams", "variety", { names = "Variety", at = { 4 }, line = "Die 4 d
         end
     end })
 
----------------------------------------------------------------- Friends
 local function sameKiller(d, f)
     if d.npc and f.npc then return d.npc == f.npc end
     return f.killer ~= nil and ns.DeathTitle(d) == f.killer
@@ -342,7 +329,6 @@ addTrophy("friends", "funeral", { names = "Big Funeral", at = { 5 }, line = "Hav
             if who.count > s.n then s.n = who.count end
         end
     end })
--- Own deaths and friends' deaths seen so far, newest last; both trophies look back and forth in time.
 local function together(window, check)
     return function(s, e)
         s.mine, s.theirs = s.mine or {}, s.theirs or {}
@@ -376,11 +362,8 @@ addTrophy("friends", "partyWipe", { names = "Party Wipe", line = "Die with 2 or 
     end) })
 addTrophy("friends", "sharedNemesis", { names = "Shared Nemesis", line = "Get killed by a friend's nemesis.", step = kindCount("sharedNemesis") })
 
----------------------------------------------------------------- Checking
-
 function T.Get(id) return byId[id] end
 
--- The big groups open into subgroups in the pane, as Blizzard's achievement categories do.
 T.SUBGROUPS = {
     general = { { "counts", "Death counts" }, { "life", "Life and levels" }, { "characters", "Characters" }, { "time", "Time and place" } },
     causes = { { "world", "The world" }, { "hits", "Hits and magic" } },
@@ -405,7 +388,6 @@ for sub, ids in pairs(SUB) do
     for _, id in ipairs(ids) do byId[id].sub = sub end
 end
 
--- Each trophy's icon, a game icon by file ID (client data, ManifestInterfaceData, build 1.60.1.70245).
 local SKULL, ELF_SKULL, SKULL2, BOOK, MAP, WATCH, TWILIGHT, NOTE = 133730, 133729, 237274, 133741, 134269, 134376, 136223, 134328
 local GROUP_ICONS = { general = SKULL, causes = 136147, killers = ELF_SKULL, dungeons = 255343, pvp = 236368,
     resurrection = 135955, streams = WATCH, friends = 134149 }
@@ -423,8 +405,6 @@ local ICONS = { roughDay = 136147, unlucky = SKULL2, friday13 = SKULL2, alive = 
     respects = 135946, funeral = 135898, partyWipe = 134148, sharedNemesis = ELF_SKULL }
 function T.Icon(def) return ICONS[def.id] or GROUP_ICONS[def.group] end
 
--- Points as Blizzard gives them: 10 for most, 25 for a collection and a ladder's middle steps, 50
--- for a ladder's last.
 function T.Points(def, tier)
     if def.parts then return 25 end
     if #def.at == 1 or tier == 1 then return 10 end
@@ -439,7 +419,6 @@ function T.TotalPoints()
     return n
 end
 
--- A trophy with one name has it as its card's title: its steps are only the goal.
 function T.StepText(def, tier)
     local goal = def.unit(def.at[tier])
     if type(def.names) == "table" then return ("%s, %s"):format(T.Name(def, tier), goal) end
@@ -453,7 +432,6 @@ function T.Name(def, tier)
     return def.names[math.min(math.max(tier, 1), #def.names)]
 end
 
--- Everything a trophy can be earned by, oldest first. now: also the time played right now.
 local function events(now)
     local out = {}
     for i, d in ipairs(ns.db.deaths) do out[#out + 1] = { kind = "death", d = d, time = d.time, char = d.char, order = i } end
@@ -470,7 +448,6 @@ local function events(now)
     return out
 end
 
--- Every trophy's progress (s.n, and s.seen for a collection) and the event that reached each step.
 local function evaluate(now)
     local states, reached = {}, {}
     for _, def in ipairs(defs) do states[def.id], reached[def.id] = { n = 0, seen = {}, by = {}, last = {} }, {} end
@@ -529,12 +506,10 @@ function T.Check()
     for _, f in ipairs(fresh) do if T.GroupShown(f.def.group) then alert(f.def, f.tier) end end
 end
 
--- Steps earned, in order: { time, char, death, npc } each.
 function T.Earned(id) return ns.db.trophies and ns.db.trophies[id] or {} end
 
 function T.Progress(id) return T.state[id] or { n = 0, seen = {} } end
 
--- Something friends did that a trophy counts: kept for good (the Recent list keeps only the latest).
 function T.Fact(kind, fields)
     if ns.Friends.IsDemo() then return ns.Changed() end
     local f = fields or {}
@@ -548,7 +523,6 @@ function T.SharesWithAnyone()
     return false
 end
 
--- Streams only with Streamer.bot on, Friends once you share; a group with an earned trophy stays.
 function T.GroupShown(key)
     if key == "streams" and not ns.Streaming() then return false end
     if key == "friends" and not T.SharesWithAnyone() then
@@ -558,10 +532,8 @@ function T.GroupShown(key)
     return true
 end
 
--- A hidden trophy shows once a step is earned.
 function T.Shown(def) return T.GroupShown(def.group) and (not def.hidden or next(T.Earned(def.id)) ~= nil) end
 
--- Steps earned and steps there are, of the trophies shown (in one group, or one subgroup of it).
 function T.Counts(group, sub)
     local got, all = 0, 0
     for _, def in ipairs(defs) do
@@ -586,5 +558,5 @@ ns.OnChange(function()
         T.Check()
     end)
 end)
--- Played this life counts toward Hard to Kill while you play.
+-- Played this life counts toward Hard to Kill while you play, so it ticks.
 C_Timer.NewTicker(60, function() if ns.db and ns.CharacterKey() then T.Check() end end)

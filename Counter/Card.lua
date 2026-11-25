@@ -1,5 +1,3 @@
--- The death card, a toast: rises in the moment you die with what killed you, the details and a
--- joke (plus a trophy line on a death that earns one), stays 7 seconds, then fades out by itself.
 local _, ns = ...
 local UI = ns.UI
 
@@ -7,12 +5,12 @@ local WIDTH, MIN_WIDTH, PAD_X, PAD_TOP, PAD_BOTTOM, GAP = 640, 420, 32, 26, 28, 
 local INNER = WIDTH - 2 * PAD_X
 local TROPHY_GAP = 12
 local MARK, MARK_GAP = 44, 8
--- Cinzel's capitals sit high in the title's line: centred on the whole line, the mark hung below them.
+-- Cinzel's capitals sit high in their line.
 local MARK_RISE = 7
 
 local frame, lines, divider, pop, held
 
--- Under Blizzard's death popup. A frame's position is in its own scale, hence the division.
+-- A frame's position is in its own scale.
 function ns.CardSpot()
     local s = ns.db.settings
     return s.cardPosition, "TOP", 0, -280 / s.cardScale
@@ -127,7 +125,6 @@ end
 ns.ShowCard = show
 ns.OnDeath(function(d) show(d, false) end)
 
--- For testing in game: /deathtracker card <cause> shows your card for a made-up death. Nothing is saved.
 local EXAMPLES = {
     mob = { killer = "Kobold Miner", spell = "Melee", zone = "Elwynn Forest", level = 9 },
     player = { killer = "Lil Dusk", spell = "Sinister Strike", zone = "Stranglethorn Vale", level = 38 },

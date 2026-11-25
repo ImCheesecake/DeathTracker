@@ -1,6 +1,3 @@
--- The wanted poster, in a spot of its own: when a mob becomes your nemesis or kills you again (once
--- a session, or once a stream with Streamer.bot), stamped when you or your party kill one (once until
--- it kills you again). Kept on screen, it stays up and follows your nemesis.
 local _, ns = ...
 local UI = ns.UI
 
@@ -21,7 +18,6 @@ local function tip(self)
         ("Show every death to %s."):format(self.name))
 end
 
--- "Kill 2 more to collect the bounty", or once for a rare, an elite or a boss.
 function ns.BountyLine(char, npc)
     local left, owed = ns.BountyLeft(char, npc)
     if owed == 1 then return "Kill it once to collect the bounty" end
@@ -179,7 +175,6 @@ local function onDeath(d, before, escaped)
     local shows = kept() or (ns.db.settings.poster and ns.CardShows())
     if escaped and kind ~= "new" then
         if not shows then return end
-        -- Another mob took over on a death it didn't cause: its poster, saying the old one escaped.
         local now = ns.CharacterNemesis()
         if not now then return escape(d.char, escaped) end
         raise(d.char, now, "new", lastZone(d.char, now), nil, escapedName(escaped))
@@ -206,7 +201,6 @@ local function onBounty(char, npc)
     if kept() or (ns.db.settings.poster and ns.CardShows()) then collect(char, npc) end
 end
 
--- Kept, the poster shows the nemesis, or the bounty stamped on it until closed, after a reload too.
 local function showKept()
     local char = ns.CharacterKey()
     local npc, stamp = ns.Nemesis({ char = char }), ns.db.posterStamp
@@ -220,7 +214,6 @@ local function showKept()
     end
 end
 
--- Kept, it follows the nemesis when deaths are deleted too; a collected bounty stays until closed.
 local function onChange()
     if held or not (kept() and poster and poster:IsShown()) then return end
     local npc, collected = ns.CharacterNemesis(), showing[3] == "bounty"
@@ -258,7 +251,6 @@ local function previewDeath()
         joke = ns.Joke({ cause = "mob", killer = e.name }, e.kind) }, e
 end
 
--- kind: new, again or bounty; up until closed, whatever the once-only rules say. Nothing is saved.
 function ns.Preview(kind)
     local d, who = previewDeath()
     if kind == "bounty" then
@@ -272,9 +264,6 @@ function ns.Preview(kind)
     held = true
 end
 
--- For testing in game: /deathtracker poster new, again or bounty as the Preview buttons do, escaped
--- and paid (a kill that pays part of the bounty); size <n> is the share of its box the model fills
--- (0.9), and mob <NPC ID> or display <display ID> shows any model on it.
 local PREVIEW = { new = true, again = true, bounty = true }
 function ns.PreviewPoster(args)
     local kind, value = args:match("^(%S*)%s*(.-)$")

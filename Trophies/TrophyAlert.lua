@@ -1,5 +1,3 @@
--- When a trophy is earned: Blizzard's achievement popup with our words (board "Trophies page"):
--- "Trophy earned", its name, its points on Blizzard's shield, the addon's icon.
 local _, ns = ...
 local UI, T = ns.UI, ns.Trophies
 
@@ -78,8 +76,6 @@ local function popUp(def, tier, held)
 end
 T.OnEarned(popUp)
 
--- /deathtracker trophy [id] [step]: the popup for any trophy, earned or not. held: it stays until
--- clicked and can be dragged to where trophies pop up (the settings' Show a trophy).
 function ns.PreviewTrophy(rest, held)
     local id, step = (rest or ""):match("^(%S*)%s*(%d*)")
     local def = T.Get(id ~= "" and id or "deaths")

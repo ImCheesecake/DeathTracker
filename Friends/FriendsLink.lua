@@ -1,33 +1,28 @@
--- Sends and receives friends' death counts as hidden addon messages: Battle.net game data to
--- Battle.net friends (any faction or ruleset), guild and party messages, else a whisper (same
--- faction and ruleset only). Tested on Forever 2026-11-11 (docs/ingame-tests-2026-11-11.md).
 local _, ns = ...
 local F = ns.Friends
 local L = {}
 ns.FriendsLink = L
 
 L.PREFIX = "DeathTracker"
-L.PIECE = 200        -- record text per message; a message holds 255 bytes with its header
-L.GAP = 0.15         -- seconds between two sends; Blizzard throttles a burst
+L.PIECE = 200        -- a message holds 255 bytes with its header
+L.GAP = 0.15         -- Blizzard throttles a burst
 L.RETRY = 1
-L.HAVE_EACH = 12     -- id:version pairs per message
-L.PIECES_KEPT = 60   -- seconds a half-arrived record waits for the rest
-L.DEATHS_EACH = 8    -- deaths per batch
+L.HAVE_EACH = 12
+L.PIECES_KEPT = 60
+L.DEATHS_EACH = 8
 
-local online = {}    -- player id -> route, for this session
-local wants = {}     -- player id -> { [id] = true }: the records that player asked to be kept up to date on
-local greeted = {}   -- route key -> true: sent a hello this session
-local pieces = {}    -- route key .. record key -> { count, at, [i] = text }
+local online = {}
+local wants = {}
+local greeted = {}
+local pieces = {}
 local handlers = {}
--- Deaths go in their own queue, behind everything else: a first send can take minutes.
 local queue, bulk, sending = {}, {}, false
-local bulkFor = {}   -- route key -> deaths messages still waiting to go
+local bulkFor = {}
 
 local function routeKey(r) return r.bn and ("bn" .. r.bn) or r.name and ("w" .. r.name) or r.channel end
 
 L.DROPS_KEPT = 10
 
--- A dropped connection gets a hello again at the next greeting. The last few are saved with why.
 local function drop(id, why, result)
     local route = online[id]
     if not route then return end
@@ -101,16 +96,17 @@ end
 
 local function bare(text) return ((text or ""):gsub("%^", "")) end
 
--- The guild's name goes only to guildmates: over the guild, or back to a guildmate's hello.
+local accountOf
+
 local function hello(route, reply, guild)
     local name = NameUtil.GetFullNameWithoutRealm(UnitName("player"))
+    local whole = route.bn and F.SharesAccount(accountOf(route.bn))
     enqueue(route, table.concat({ "H", F.Me(), reply and 1 or 0, ns.db.settings.friendsGuild and 1 or 0,
         bare(name), select(2, UnitClass("player")) or "", UnitLevel("player"),
-        (guild or route.channel == "GUILD") and bare(F.GuildName()) or "" }, "^"))
+        (guild or route.channel == "GUILD") and bare(F.GuildName()) or "", whole and 1 or 0 }, "^"))
 end
 L.Hello = hello
 
--- Where you are now: only for players you share with.
 local function zoneTo(route) enqueue(route, "Z^" .. F.Me() .. "^" .. bare(GetRealZoneText())) end
 
 ---@param wire string
@@ -122,7 +118,6 @@ local function recordTo(route, id, wire)
     end
 end
 
--- A friend on a version without deaths doesn't answer.
 local function askDeaths(id, route)
     if route.demo then return end
     local count, newest = F.Holding(id)
@@ -143,15 +138,17 @@ local function deathsTo(route, count, newest)
     end
 end
 
--- A friend opened in the window: ask for their deaths, once a session (each hello asks again).
 local asked = {}
-function L.WantDeaths(id)
-    if F.WantsDeaths(id) and asked[id] then return end
-    F.WantDeaths(id)
-    local route = L.Online(id)
-    if route and not route.demo then
-        asked[id] = true
-        askDeaths(id, route)
+function L.WantDeaths(person)
+    for _, id in ipairs(F.Ids(person)) do
+        if not (F.WantsDeaths(id) and asked[id]) then
+            F.WantDeaths(id)
+            local route = L.Online(id)
+            if route and not route.demo then
+                asked[id] = true
+                askDeaths(id, route)
+            end
+        end
     end
 end
 
@@ -168,7 +165,6 @@ local function have(route)
     zoneTo(route)
 end
 
--- Battle.net friends playing this game: { { bn = gameAccountID, account = index } }.
 function L.BattleNetFriends()
     local out = {}
     for i = 1, BNGetNumFriends() do
@@ -182,8 +178,7 @@ function L.BattleNetFriends()
     return out
 end
 
--- BattleTag without the numbers ("Grimtusk" from "Grimtusk#2190"); never the account name, which
--- is a Real ID friend's real name.
+-- Never the account name: for a Real ID friend it's their real name.
 local function tagOf(account)
     local a = C_BattleNet.GetFriendAccountInfo(account)
     return a and a.battleTag and a.battleTag:match("^([^#]+)")
@@ -193,6 +188,28 @@ function L.TagOf(gameAccountID)
     for _, g in ipairs(L.BattleNetFriends()) do
         if g.bn == gameAccountID then return tagOf(g.account) end
     end
+end
+
+accountOf = function(gameAccountID)
+    for _, g in ipairs(L.BattleNetFriends()) do
+        if g.bn == gameAccountID then
+            local a = C_BattleNet.GetFriendAccountInfo(g.account)
+            return a and a.battleTag
+        end
+    end
+end
+L.AccountOf = accountOf
+
+function L.AccountByTag(tag)
+    local found
+    for i = 1, BNGetNumFriends() do
+        local a = C_BattleNet.GetFriendAccountInfo(i)
+        if a and a.battleTag and a.battleTag:match("^([^#]+)") == tag then
+            if found then return nil end
+            found = a.battleTag
+        end
+    end
+    return found
 end
 
 local function candidates()
@@ -206,7 +223,6 @@ local function candidates()
     return out
 end
 
--- Says hello to everyone who might have Death Tracker; all = again to those already greeted.
 function L.Greet(all)
     for _, route in ipairs(candidates()) do
         local key = routeKey(route)
@@ -217,8 +233,6 @@ function L.Greet(all)
     end
 end
 
--- A Battle.net friend who logged off, or a friends-list friend shown offline, is gone.
--- Returns whether they are, and if not, which list said so.
 local function stillOnline(route)
     if route.demo then return F.IsDemo(), "demo" end
     if route.bn then
@@ -236,8 +250,8 @@ local function prune()
     end
 end
 
--- In a match addon messages are locked both ways (tested 2026-11-12), so a friend's Death Tracker
--- can't answer there; Blizzard's friends list still says where they are.
+-- In a match addon messages are locked both ways, so a friend's Death Tracker can't answer there;
+-- Blizzard's friends list still says where they are.
 local BATTLEGROUNDS_FOR = 30
 local battlegrounds, battlegroundsAt
 function L.Battleground(id)
@@ -261,7 +275,6 @@ function L.Online(id)
     drop(id, why)
 end
 
--- Online players with Death Tracker, sharing with you or not.
 function L.OnlinePlayers()
     prune()
     local out = {}
@@ -269,11 +282,8 @@ function L.OnlinePlayers()
     return out
 end
 
--- A demo friend counts as online and is never sent anything.
 function L.Pretend(id) online[id] = { demo = true } end
 
--- Where a friend we have no connection to might be: their Battle.net game account, or their
--- character on your friends list.
 local function reachFor(id)
     local k, out = F.Store().known[id], {}
     if not k then return out end
@@ -285,11 +295,9 @@ local function reachFor(id)
     return out
 end
 
-L.WAIT = 30          -- seconds a send waits for the hello that brings a dropped friend back
-local waiting = {}   -- player id -> { { text, onSent, at } }
+L.WAIT = 30
+local waiting = {}
 
--- onSent: with it, a friend with no connection is said hello to, and the message goes (and onSent
--- runs) once they answer within L.WAIT. Returns true when it went now.
 function L.SendTo(id, text, onSent)
     local route = L.Online(id)
     if route then
@@ -326,7 +334,6 @@ local function sendWaiting(id)
     end
 end
 
--- Your record to everyone online who keeps up with you.
 function L.Broadcast()
     if not next(online) then return end
     local me, wire = F.Me(), nil
@@ -350,7 +357,6 @@ local function direct(route, sender)
     return sender and { name = sender }
 end
 
--- A message names its sender's id; it counts only from the route that id said hello from.
 local function trusted(id, from)
     return id ~= nil and online[id] ~= nil and routeKey(online[id]) == routeKey(from)
 end
@@ -365,7 +371,12 @@ function receive.H(route, p, sender)
     if not trusted(id, from) then return end
     local k = F.Known(id)
     k.char, k.class, k.level, k.seen = p[5], p[6] ~= "" and p[6] or nil, tonumber(p[7]), time()
-    if from.bn then k.tag = L.TagOf(from.bn) or k.tag end
+    if from.bn then k.tag, k.account = L.TagOf(from.bn) or k.tag, accountOf(from.bn) or k.account end
+    -- Over Battle.net, Blizzard names the sender's account, so a share made from any of our WoW accounts holds here too.
+    if from.bn and p[9] == "1" and not F.Shares(id) and k.account and not (F.Store().stopped or {})[k.account] then
+        F.Share(id)
+        F.AddEvent({ kind = "shared", id = id, how = "Battle.net" })
+    end
     if route.channel == "GUILD" or p[8] ~= "" then
         local before, guild = F.Shares(id), F.GuildName()
         k.inGuild = guild and p[8] == guild and guild or nil
@@ -479,7 +490,7 @@ end)
 ns.OnEvent("BN_CHAT_MSG_ADDON", function(prefix, text, _, gameAccountID)
     if prefix == L.PREFIX then dispatch({ bn = gameAccountID }, text) end
 end)
--- The roster changes in bursts (every join, leave and loot setting): one hello once it settles.
+-- GROUP_ROSTER_UPDATE comes in bursts (every join, leave and loot setting).
 local GROUP_SETTLE = 3
 local groupPending = false
 ns.OnEvent("GROUP_ROSTER_UPDATE", function()
@@ -502,7 +513,6 @@ ns.OnEvent("ZONE_CHANGED_NEW_AREA", function()
 end)
 ns.OnDeath(function() C_Timer.After(1, L.Broadcast) end)
 
--- The name of a player we whispered who isn't playing, from Blizzard's error line.
 local function missed(text)
     if type(text) ~= "string" or issecretvalue(text) then return nil end
     local line = text:lower()

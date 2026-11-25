@@ -1,4 +1,3 @@
--- The history window's Killers page: the mobs and the players that killed you, most kills first.
 local _, ns = ...
 local UI = ns.UI
 local Shell = ns.HistoryShell
@@ -56,7 +55,7 @@ local function killerTip(row, item)
     local f = Shell.Filter()
     if not f.char and not f.name then
         local on = {}
-        for _, c in ipairs(H.KillsOn(k.deaths)) do on[#on + 1] = c.name .. " " .. c.kills end
+        for _, c in ipairs(H.KillsOn(k.deaths)) do on[#on + 1] = UI.CharName(c.name) .. " " .. c.kills end
         lines[#lines + 1] = UI.TipPair("Kills on", table.concat(on, ", "))
     end
     if k.zone then lines[#lines + 1] = UI.TipPair("Most kills in", k.zone) end
@@ -75,8 +74,7 @@ local function fastest(deaths)
     return best
 end
 
--- The killer sel names, from the deaths it reads: sel.of a friend's, sel.mine yours, else the pane's
--- and the filter's. A mob without its id (an older Recent event) is found by its name.
+-- An older Recent event's mob has no NPC id, so it is found by its name.
 local function findKiller(sel)
     local f = sel.of and { of = sel.of } or sel.mine and {} or Shell.Filter()
     for _, k in ipairs(sel.player and H.Players(f) or H.Mobs(f)) do
@@ -87,7 +85,6 @@ local function findKiller(sel)
 end
 Shell.FindKiller = findKiller
 
--- A killer's profile: how often, how fast, how it hits you, the deaths it caused.
 local function killerDetails(panel, sel)
     if sel.kind ~= "killer" then return false end
     local item = findKiller(sel)
