@@ -1,0 +1,38 @@
+name: Bug report
+description: Something in Death Tracker doesn't work right.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what you saw instead. A screenshot helps.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can we see it?
+      description: The steps that make it happen, if you know them.
+      placeholder: |
+        1. Die to a Defias Pillager in Westfall on a level 14 character
+        2. Type /deaths and open Killers
+        3. Defias Pillager is missing, and the corner counter still says 3
+  - type: input
+    id: version
+    attributes:
+      label: Death Tracker version
+      placeholder: "1.6.1"
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Lua error
+      description: If the game showed an error, paste it here, from BugSack or the game's error window.
+      render: text
+  - type: input
+    id: addons
+    attributes:
+      label: Other addons for combat, nameplates or chat
+      placeholder: "Details!, Questie, Prat"

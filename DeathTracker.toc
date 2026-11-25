@@ -1,0 +1,48 @@
+## Interface: 16001
+## Title: Death Tracker
+## Notes: Counts your deaths and shows what killed you.
+## Author: ImCheesecak3
+## Version: 1.6.1
+## IconTexture: Interface\AddOns\DeathTracker\Media\Icon
+## SavedVariables: DeathTrackerDB
+## AddonCompartmentFunc: DeathTracker_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: DeathTracker_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: DeathTracker_OnAddonCompartmentLeave
+
+Libs\LibStub\LibStub.lua
+Libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+Libs\LibDataBroker-1.1\LibDataBroker-1.1.lua
+Libs\LibDBIcon-1.0\LibDBIcon-1.0.lua
+Core\Classify.lua
+Core\Bridge.lua
+UI.lua
+Core\Core.lua
+History\History.lua
+Recap\Recap.lua
+Recap\RecapRoasts.lua
+Recap\RecapToast.lua
+Recap\RoadTo60.lua
+Friends\Friends.lua
+Trophies\Trophies.lua
+Trophies\TrophyAlert.lua
+Counter\Counter.lua
+Counter\CounterBar.lua
+Counter\Jokes.lua
+Counter\Card.lua
+Counter\Poster.lua
+Core\Stream.lua
+Core\AfterDeath.lua
+Friends\FriendsLink.lua
+Friends\FriendsAsk.lua
+Friends\FriendsAlerts.lua
+Core\StreamerbotImport.lua
+Counter\Options.lua
+History\HistoryWindow.lua
+History\HistoryDeaths.lua
+History\HistoryKillers.lua
+History\HistoryZones.lua
+History\HistoryRecords.lua
+History\HistoryTrophies.lua
+History\HistoryFriends.lua
+Counter\MinimapButton.lua
+Counter\Tooltip.lua
