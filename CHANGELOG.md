@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.7.1 (2026-11-25)
+
+A fix for friends who show a character twice.
+
+### Fixed
+
+- **Friends:** a friend who lost their Death Tracker data no longer shows a character twice. Its old and new deaths are added together.
+
 ## 1.7.0 (2026-11-25)
 
 A warning when a player who killed you is near, and friends with more than one WoW account.

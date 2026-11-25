@@ -327,6 +327,52 @@ local function deathsFrom(text)
     return out
 end
 
+local function addInto(into, from)
+    for _, p in ipairs(F.PERIODS) do into[p] = (into[p] or 0) + (from and from[p] or 0) end
+end
+
+local SUMS = { "deaths", "repair", "ghost", "bg", "dungeon" }
+local BESTS = { { "longest", "longestWhat", "longestZone", "longestTime" }, { "hit", "hitWhat", "hitTime", "hitZone" },
+    { "ran", "ranZone", "ranTime", "runSecs" }, { "costly", "costlyWhat", "costlyTime" },
+    { "ghostMost", "ghostZone", "ghostTime" }, { "dayMost", "dayMostDay" } }
+
+local function sameChar(a, b)
+    local new, old = a, b
+    if (b.level or 0) > (a.level or 0) then new, old = b, a end
+    local c = {}
+    for k, v in pairs(new) do c[k] = v end
+    for _, f in ipairs(SUMS) do c[f] = (a[f] or 0) + (b[f] or 0) end
+    for _, f in ipairs({ "pDeaths", "pBg", "pDungeon" }) do
+        c[f] = {}
+        addInto(c[f], a[f])
+        addInto(c[f], b[f])
+    end
+    c.pLongest = {}
+    for _, p in ipairs(F.PERIODS) do c.pLongest[p] = math.max(a.pLongest and a.pLongest[p] or 0, b.pLongest and b.pLongest[p] or 0) end
+    for _, group in ipairs(BESTS) do
+        local from = (old[group[1]] or 0) > (new[group[1]] or 0) and old or new
+        for _, f in ipairs(group) do c[f] = from[f] end
+    end
+    if old.last and old.last.time > (new.last and new.last.time or 0) then c.last = old.last end
+    return c
+end
+
+-- A full name is one character on Forever, so two entries with one name are the same character: a friend
+-- whose saved data was reset (a new id) or saved under a realmless key.
+local function byName(chars)
+    local out, at = {}, {}
+    for _, c in ipairs(chars) do
+        local i = at[c.name]
+        if i then
+            out[i] = sameChar(out[i], c)
+        else
+            out[#out + 1] = c
+            at[c.name] = #out
+        end
+    end
+    return out
+end
+
 function F.Parse(text)
     local p = split(text, "^")
     -- 29: the first format's field count; later formats only add fields at the end.
@@ -385,6 +431,7 @@ function F.Parse(text)
         for i, period in ipairs(F.PERIODS) do ch.pDeaths[period], ch.pLongest[period] = num(cd[i]), num(cl[i]) end
         rec.chars[#rec.chars + 1] = ch
     end
+    rec.chars = byName(rec.chars)
     for _, k in ipairs(p[21] ~= "" and split(p[21], "~") or {}) do
         local f = split(k, ",")
         local npc = tonumber(f[1])
@@ -583,10 +630,6 @@ local function renumbered(id, e)
     return copy
 end
 
-local function addInto(into, from)
-    for _, p in ipairs(F.PERIODS) do into[p] = (into[p] or 0) + (from and from[p] or 0) end
-end
-
 local function topBy(list, key, keep)
     local byKey, out = {}, {}
     for _, x in ipairs(list) do
@@ -639,7 +682,15 @@ local function merge(ids, recs)
             end
         end
         m.sentAt = math.max(m.sentAt or 0, r.sentAt or 0)
-        for _, c in ipairs(r.chars) do m.chars[#m.chars + 1] = c end
+        for _, c in ipairs(r.chars) do
+            local copy = {}
+            for k, v in pairs(c) do copy[k] = v end
+            for _, f in ipairs({ "pDeaths", "pLongest", "pBg", "pDungeon" }) do
+                copy[f] = {}
+                for _, p in ipairs(F.PERIODS) do copy[f][p] = fresh[p] and c[f] and c[f][p] or 0 end
+            end
+            m.chars[#m.chars + 1] = copy
+        end
         for _, k in ipairs(r.killers) do killers[#killers + 1] = k end
         for _, k in ipairs(r.allKillers or {}) do all[#all + 1] = k end
         for _, z in ipairs(r.zones or {}) do zones[#zones + 1] = z end
@@ -650,6 +701,7 @@ local function merge(ids, recs)
     for _, p in ipairs(F.PERIODS) do
         m.pDeaths[p], m.pDungeon[p], m.pBg[p], m.pLongest[p] = m.pDeaths[p] or 0, m.pDungeon[p] or 0, m.pBg[p] or 0, m.pLongest[p] or 0
     end
+    m.chars = byName(m.chars)
     table.sort(m.chars, function(a, b) return a.name < b.name end)
     m.killers = topBy(killers, function(k) return k.npc end, F.KILLERS)
     m.allKillers = topBy(all, function(k) return k.kind .. k.key end, F.ALL_KILLERS)
