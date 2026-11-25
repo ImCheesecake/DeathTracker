@@ -1,26 +1,27 @@
 # Death Tracker
 
-A WoW Forever addon that counts your deaths and shows what killed you. Get it on CurseForge:
-https://www.curseforge.com/wow/addons/death-tracker-forever. Found a bug? Report it here:
-https://github.com/ImCheesecake/DeathTracker/issues.
+Counts your deaths and shows what killed you. For WoW: Forever.
 
-The version is in `DeathTracker.toc`; what changed is in `CHANGELOG.md`. `streamerbot/` holds the
-C# inside the Streamer.bot import. MIT licensed (`LICENSE`); the embedded libraries keep their own
-licenses (`Libs/README.md`).
+- See what killed you on a death card, with a joke to match.
+- Keep your death count on screen.
+- Look back at every death on every character: killers, zones and records.
+- Earn trophies, hunt your nemesis and get a recap each month.
+- Share deaths with friends and see who dies most.
+- Post each death to Twitch chat through Streamer.bot.
 
-## Why the code does what it does
+## Install
 
-Background that used to sit in the code's comments:
+Install it from [CurseForge](https://www.curseforge.com/wow/addons/death-tracker-forever).
 
-- **The counter without its panel** (`UI.Bare`): every text gets the game's hard dark outline,
-  small text also a shadow, and grey text turns light, so it reads on snow and sand as well as at
-  night. The bar keeps its border (`backdrop` lists what goes): its shape holds the tab together.
-- **The bar's notch** (`UI.Notch`): a panel with a tab under it, joined by inward curves. The fill
-  is see-through, so no two pieces may overlap or the overlap shows darker: the bar's bottom edge is
-  two lines that stop where the curves start, and the curve textures (`dev/make_textures.py`) leave
-  out the row the bar already fills and the column the tab fills.
-- **Letter spacing** (`UI.Spaced`): game text has none, so a narrow space goes between letters. In
-  Inter the "hair" space is 0.08em wide, the "thin" one 0.17em.
-- **The nemesis takes 3 kills** (`ns.Nemesis`): two can be one bad pull.
-- **Streamer.bot sending is off by default** (`ns.DEFAULTS`): it writes ~64 KB to General.log per
-  death, which only helps someone who imported the Streamer.bot side.
+## Use
+
+Click the minimap button or type `/deaths`. For Twitch chat, turn on **Send each death to
+Streamer.bot** in the settings and import the code from **Show import code** in Streamer.bot.
+
+## Report a bug
+
+[Open a bug report](https://github.com/ImCheesecake/DeathTracker/issues/new/choose).
+
+## License
+
+MIT, see `LICENSE`. The libraries in `Libs/` keep their own licenses, listed in `Libs/README.md`.
