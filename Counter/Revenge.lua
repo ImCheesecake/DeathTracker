@@ -43,11 +43,14 @@ local function avenge(name, classFile, friends)
 end
 
 ns.OnEvent("PARTY_KILL", function(attacker, target)
-    if issecretvalue(attacker) or issecretvalue(target) or attacker ~= UnitGUID("player") or ns.InBattle() then return end
+    if issecretvalue(attacker) or issecretvalue(target) or attacker ~= UnitGUID("player") then return end
     local who = G.Known(target)
     if not who then return end
     local v = G.Victims(who.name)
     if not v.any then return end
+    -- Blizzard blocks addon messages inside a battleground, so friends can't be told they were avenged there.
+    if ns.InBattle() then v.friends = {} end
+    if #v.you + #v.alts + #v.friends == 0 then return end
     R.Show(who.name, v, who.class)
     avenge(who.name, who.class, v.friends)
 end)
@@ -55,7 +58,7 @@ end)
 L.On("V", function(id, p)
     local name = p[3]
     if not name or name == "" or ns.InBattle() then return end
-    local n = #ns.Deaths({ player = name, since = time() - G.DAYS * 86400 })
+    local n = #ns.Deaths({ player = name, since = time() - G.DAYS * 86400, noBattle = true })
     if n == 0 then return end
     local classFile = p[4] ~= "" and p[4] or nil
     F.AddEvent({ kind = "avenged", id = id, player = name, class = classFile, n = n, zone = p[5] })

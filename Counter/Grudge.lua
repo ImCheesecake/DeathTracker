@@ -1,12 +1,13 @@
--- The grudge warning: a player who killed you, another of your characters or a friend in the last 7 days
--- comes into view (target, mouse-over or nameplate): a raid warning, a horn and a line in chat. Friends who
--- share counts get a chat line saying where.
+-- The grudge warning: a player who killed you, your other characters or friends twice in the last 7 days,
+-- outside battlegrounds and arenas, comes into view (target, mouse-over or nameplate): a raid warning, a
+-- horn and a line in chat, only the line inside a battleground. Friends who share counts get a chat line.
 local _, ns = ...
 local UI, F, L = ns.UI, ns.Friends, ns.FriendsLink
 local G = {}
 ns.Grudge = G
 
 G.DAYS = 7
+G.DEATHS = 2         -- one kill is how the game goes; a second one, on you or a friend, makes a grudge
 G.AGAIN = 600        -- seconds before the same player warns again
 G.SHOWN = 8          -- the display time: held 5 seconds, then Blizzard's 3-second fade
 G.POP = 40
@@ -21,15 +22,17 @@ local frame
 function G.Victims(name)
     local since, me = time() - G.DAYS * 86400, ns.CharacterKey()
     local v = { you = {}, alts = {}, friends = {} }
-    for _, d in ipairs(ns.Deaths({ player = name, since = since })) do
+    for _, d in ipairs(ns.Deaths({ player = name, since = since, noBattle = true })) do
         table.insert(d.char == me and v.you or v.alts, d)
     end
     for _, rec in ipairs(F.Players()) do
-        local list = ns.Deaths({ of = rec.id, player = name, since = since })
+        local list = ns.Deaths({ of = rec.id, player = name, since = since, noBattle = true })
         if #list > 0 then v.friends[#v.friends + 1] = { id = rec.id, deaths = list } end
     end
     table.sort(v.friends, function(a, b) return a.deaths[1].time > b.deaths[1].time end)
-    v.any = #v.you + #v.alts + #v.friends > 0
+    local total = #v.you + #v.alts
+    for _, f in ipairs(v.friends) do total = total + #f.deaths end
+    v.any = total >= G.DEATHS
     return v
 end
 
@@ -74,9 +77,9 @@ function G.Rows(v, named)
     return rows
 end
 
-local function last(d) return (", last %s in %s"):format(UI.Date(d.time), d.zone or "?") end
+local function last(d) return (", last time %s in %s"):format(UI.Date(d.time), d.zone or "?") end
 
--- After a part with its own commas ("you once, last today in Duskwood"), the last "and" takes one too.
+-- After a part with its own commas ("you once, last time today in Duskwood"), the last "and" takes one too.
 local function andList(parts)
     local text = UI.AndList(parts)
     if #parts > 1 and parts[1]:find(",") then
@@ -115,8 +118,9 @@ function G.ChatLine(name, v)
 end
 
 function G.Show(name, v, classFile)
-    frame = frame or UI.RaidWarning(G.POP)
     local shown = painted(name, classFile)
+    if ns.InBattle() then return UI.Say(G.ChatLine(shown, v)) end
+    frame = frame or UI.RaidWarning(G.POP)
     frame:Warn(shown .. " is near.\n" .. table.concat(G.Rows(v), "\n") .. ".", G.SHOWN)
     PlaySound(G.HORN[UnitFactionGroup("player")] or G.HORN.Alliance)
     UI.Say(G.ChatLine(shown, v))
@@ -152,14 +156,13 @@ function G.Check(name, classFile)
     if not v.any then return end
     warned[name] = now
     G.Show(name, v, classFile)
-    tellFriends(name, v, classFile)
+    if not ns.InBattle() then tellFriends(name, v, classFile) end
 end
 
 -- Revenge reads the name here: PARTY_KILL gives only the GUID.
 function G.Known(guid) return names[guid] end
 
 local function seen(unit)
-    if ns.InBattle() then return end
     local player, enemy = UnitIsPlayer(unit), UnitCanAttack("player", unit)
     if issecretvalue(player) or issecretvalue(enemy) or not player or not enemy then return end
     local first, surname = UnitName(unit)
@@ -186,7 +189,7 @@ L.On("K", function(id, p)
     if not ns.db.settings.grudge or not F.Shares(id) then return end
     local name, zone, victim, n = p[3], p[4], p[5], tonumber(p[6]) or 0
     if not name or name == "" then return end
-    local mine = #ns.Deaths({ player = name, since = time() - G.DAYS * 86400 })
+    local mine = #ns.Deaths({ player = name, since = time() - G.DAYS * 86400, noBattle = true })
     local k = F.Known(id)
     UI.Say(G.FriendLine(painted(name, p[7] ~= "" and p[7] or nil), painted(k.char or F.Name(id), k.class),
         zone ~= "" and zone or "?", painted(victim ~= "" and victim or "?", p[8] ~= "" and p[8] or nil), n, mine))

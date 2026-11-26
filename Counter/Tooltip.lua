@@ -26,7 +26,7 @@ local function addLines(tooltip, data)
             UI.TipLine(tooltip, ("Your nemesis: killed you %s"):format(UI.Times(#mine)), UI.COLOR.trophy)
             UI.TipLine(tooltip, ns.BountyLine(key, killer.npc), UI.COLOR.trophy)
         else
-            UI.TipLine(tooltip, ("Killed you %s, last %s"):format(UI.Times(#mine), UI.Date(mine[1].time)),
+            UI.TipLine(tooltip, ("Killed you %s, last time %s"):format(UI.Times(#mine), UI.Date(mine[1].time)),
                 UI.CauseColor(killer.npc and "mob" or "player"))
         end
     end

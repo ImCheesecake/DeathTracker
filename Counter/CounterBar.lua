@@ -39,6 +39,7 @@ local function createBar()
     UI.Movable(frame, s.barPosition, "TOP", 0, -6, { UIWidgetTopCenterContainerFrame, "BOTTOM" }, "centre")
     UI.ResizeGrip(frame, s, "barScale", 0.5, 2)
     ns.LayoutMenu(frame)
+    UI.LeftClick(frame, ns.ToggleHistory)
     parts = { number = UI.Text(frame, "number", 32, "text"), label = UI.Text(frame, "body", 14, "muted"),
         allTime = column(frame, "bold", 15), last = column(frame, "number", 16, NAME_MAX),
         alive = column(frame, "bold", 15), nemesis = column(frame.tab, "number", 16, NAME_MAX), dividers = {} }

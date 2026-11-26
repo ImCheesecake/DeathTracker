@@ -448,6 +448,15 @@ local function tipLines(tooltip, title, text)
     GameTooltip_AddNormalLine(tooltip, text, true)
 end
 
+-- A drag moves a Movable frame with the same button, so only a press that never started a drag clicks.
+function UI.LeftClick(frame, onClick)
+    frame:HookScript("OnMouseDown", function(self) self.dragged = false end)
+    frame:HookScript("OnDragStart", function(self) self.dragged = true end)
+    frame:HookScript("OnMouseUp", function(self, button)
+        if button == "LeftButton" and not self.dragged and self:IsMouseOver() then onClick() end
+    end)
+end
+
 function UI.RightClickMenu(frame, fill, has)
     frame:SetScript("OnMouseUp", function(self, button)
         if button ~= "RightButton" or (has and not has(self)) then return end

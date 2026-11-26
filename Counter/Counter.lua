@@ -89,6 +89,7 @@ local function create()
     UI.Movable(frame, ns.db.settings.counterPosition, "TOPRIGHT", -24, -24)
     UI.ResizeGrip(frame, ns.db.settings, "counterScale", 0.5, 2)
     ns.LayoutMenu(frame)
+    UI.LeftClick(frame, ns.ToggleHistory)
     parts = { number = UI.Text(frame, "number", NUMBER_SIZE, "text"), label = UI.Text(frame, "body", 15, "muted"),
         causes = {}, divider = UI.Divider(frame), line = UI.Divider(frame, true) }
     -- The game sets Cinzel higher in its line than other text.

@@ -66,6 +66,10 @@ ns.OnEvent("PLAYER_LOGIN", function()
         card,
         check("cardBattlegrounds", "Show it in BGs and arenas",
             "The death card in battlegrounds and arenas. Off: no card there. Every death still counts.", card),
+        poster,
+        check("posterSounds", "Play the poster's sounds",
+            "A troll gong when a poster goes up. When you collect a bounty: \"Stay down.\", then Blizzard's boss "
+                .. "defeated sound as the stamp lands.", poster),
         { kind = "dropdown", label = "When a friend dies",
             tooltip = "Off: nothing.\nSmall: a small popup.\nCard: a smaller death card.\n\n"
                 .. "The Friends page counts every death either way.",
@@ -77,16 +81,13 @@ ns.OnEvent("PLAYER_LOGIN", function()
         check("friendsGuild", ns.FriendsAsk.GUILD_SETTING,
             "Guildmates who use Death Tracker show up under Guild on the Friends page. Their deaths never pop up, they "
                 .. "only go in the Recent tab.", nil, function(on) ns.FriendsAsk.SetGuild(on) end),
-        poster,
-        check("posterSounds", "Play the poster's sounds",
-            "A troll gong when a poster goes up. When you collect a bounty: \"Stay down.\", then Blizzard's boss "
-                .. "defeated sound as the stamp lands.", poster),
         check("recapMusic", "Play music with the monthly recap",
             "Rocky Road to Dublin while the recap plays, at your game's music volume."),
         check("tooltips", "Show deaths in tooltips", "A mob or player's tooltip says how often they have killed you."),
         check("grudge", "Warn me when a player who killed me or a friend is near",
-            "A warning in the middle of the screen with a battleground horn, and a line in chat. Friends who share "
-                .. "counts get a chat line saying where. Never in battlegrounds or arenas."),
+            "For a player who killed you or your friends twice in the last 7 days: a warning in the middle of the "
+                .. "screen with a battleground horn, and a line in chat. Friends who share counts get a chat line "
+                .. "saying where. Kills in battlegrounds and arenas don't count. In them, you only get the line in chat."),
         check("minimapButton", "Show the minimap button",
             "Shows or hides the Death Tracker button on the minimap.",
             nil, function(on) ns.ShowMinimapButton(on) end),
