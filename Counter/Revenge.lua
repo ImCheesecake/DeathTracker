@@ -33,13 +33,14 @@ end
 local function avenge(name, classFile, friends)
     local zone = GetRealZoneText() or ""
     for _, f in ipairs(friends) do
-        local id, n = f.id, #f.deaths
-        L.SendTo(id, ("V^%s^%s^%s^%s"):format(F.Me(), F.Clean(name), F.Clean(classFile), F.Clean(zone)), function()
-            F.AddEvent({ kind = "avengedBy", id = id, player = name, class = classFile, n = n, zone = zone })
-            F.Avenged(id)
-            ns.Trophies.Fact("avenger", { id = id })
-        end)
+        local at = F.Avenged(f.id, "player", name, classFile, zone)
+        F.AddEvent({ kind = "avengedBy", id = f.id, player = name, class = classFile, n = #f.deaths, zone = zone })
+        ns.Trophies.Fact("avenger", { id = f.id })
+        if not ns.InBattle() then
+            L.SendTo(f.id, ("J^%s^%s^%s^%s^%d"):format(F.Me(), F.Clean(name), F.Clean(classFile), F.Clean(zone), at))
+        end
     end
+    if #friends > 0 and not ns.InBattle() then C_Timer.After(1, L.Broadcast) end
 end
 
 ns.OnEvent("PARTY_KILL", function(attacker, target)
@@ -48,16 +49,16 @@ ns.OnEvent("PARTY_KILL", function(attacker, target)
     if not who then return end
     local v = G.Victims(who.name)
     if not v.any then return end
-    -- Blizzard blocks addon messages inside a battleground, so friends can't be told they were avenged there.
-    if ns.InBattle() then v.friends = {} end
-    if #v.you + #v.alts + #v.friends == 0 then return end
     R.Show(who.name, v, who.class)
     avenge(who.name, who.class, v.friends)
 end)
 
-L.On("V", function(id, p)
+-- "V" is taken by the link's own version list (FriendsLink.lua), which is read first.
+L.On("J", function(id, p)
     local name = p[3]
-    if not name or name == "" or ns.InBattle() then return end
+    local at = tonumber(p[6])
+    if not name or name == "" or ns.InBattle() or (at and at <= F.AvengeSeen(id)) then return end
+    F.AvengeSeen(id, at)
     local n = #ns.Deaths({ player = name, since = time() - G.DAYS * 86400, noBattle = true })
     if n == 0 then return end
     local classFile = p[4] ~= "" and p[4] or nil

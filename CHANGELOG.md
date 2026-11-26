@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.8.1 (2026-11-26)
+
+A fix for avenging.
+
+### Fixed
+
+- **Avenging:** your friend now gets the popup when you kill a player who killed them. If they were offline or in a battleground, they get it when they're back.
+
 ## 1.8.0 (2026-11-26)
 
 Revenge on the players who killed you, and on the ones who killed your friends.

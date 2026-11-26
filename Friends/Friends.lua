@@ -7,6 +7,7 @@ F.KILLERS = 8
 F.ZONES = 8
 F.SENT_DEATHS = 10
 F.FORMAT = 7
+F.AVENGE_DAYS = 7
 F.ALL_KILLERS = 12
 
 ns.DEFAULTS.friendDeath = "small"
@@ -200,7 +201,10 @@ local function gather()
         avengedId = s.lastAvenged and s.lastAvenged.id, avengedAt = s.lastAvenged and s.lastAvenged.time,
         repair = totals.repair, ghost = totals.ghost, ran = r.longestRun and r.longestRun.value or 0,
         hit = r.hardestHit and r.hardestHit.value or 0, bg = bg, dungeon = dungeon, pBg = pBg, pDungeon = pDungeon,
-        allKillers = allTop, zones = zones, format = F.FORMAT }
+        allKillers = allTop, zones = zones, format = F.FORMAT, avengedFor = {} }
+    for id, a in pairs(s.avengedFor or {}) do
+        if time() - a.time < F.AVENGE_DAYS * 86400 then rec.avengedFor[id] = a end
+    end
     if r.hardestHit then rec.hitWhat, rec.hitTime = ns.DeathTitle(r.hardestHit.death, true), r.hardestHit.death.time end
     if r.longestRun then
         rec.ranZone, rec.ranTime, rec.runSecs = r.longestRun.death.zone, r.longestRun.death.time, r.longestRun.death.runSecs
@@ -242,6 +246,14 @@ local function gather()
     return rec
 end
 
+local function avengedText(list)
+    local out = {}
+    for id, a in pairs(list or {}) do
+        out[#out + 1] = table.concat({ clean(id), a.time, clean(a.kind), clean(a.name), clean(a.class), clean(a.zone), a.npc or "" }, ",")
+    end
+    return table.concat(out, "~")
+end
+
 local function deathText(e)
     return table.concat({ clean(e.killer), e.npc or "", clean(e.zone), e.time or "", clean(e.char), e.level or "",
         e.number or "", clean(e.spell), clean(e.cause), e.fight or "", e.joke and esc(e.joke) or "" }, ",")
@@ -279,7 +291,7 @@ local function body(rec)
         table.concat({ rec.bg or 0, clean(rec.hitWhat), rec.hitTime or "", clean(rec.ranZone), rec.ranTime or "" }, ","),
         F.FORMAT, table.concat({ rec.dungeon or 0, table.concat(periods(rec.pDungeon or {}), "/"),
             table.concat(periods(rec.pBg or {}), "/") }, ","), table.concat(all, "~"), rec.runSecs or "",
-        table.concat(earlier, "~"), clean(l.cause), table.concat(zones, "~"), l.fight or "", table.concat(records, "~"), l.joke and esc(l.joke) or "" }, "^")
+        table.concat(earlier, "~"), clean(l.cause), table.concat(zones, "~"), l.fight or "", table.concat(records, "~"), l.joke and esc(l.joke) or "", avengedText(rec.avengedFor) }, "^")
 end
 
 function F.Mine()
@@ -412,6 +424,13 @@ function F.Parse(text)
             level = tonumber(p[15]), number = tonumber(p[16]), spell = opt(p[22]), cause = opt(p[36]) }
         fightFrom(p[38], rec.last)
         rec.last.joke = opt(p[40]) and unesc(p[40])
+    end
+    rec.avengedFor = {}
+    for _, a in ipairs(opt(p[41]) and split(p[41], "~") or {}) do
+        local f = split(a, ",")
+        if opt(f[1]) and tonumber(f[2]) then
+            rec.avengedFor[f[1]] = { time = tonumber(f[2]), kind = opt(f[3]), name = opt(f[4]), class = opt(f[5]), zone = opt(f[6]), npc = tonumber(f[7]) }
+        end
     end
     rec.earlier, rec.records = deathsFrom(p[35]), deathsFrom(p[39])
     if tonumber(p[17]) then rec.nem = { npc = tonumber(p[17]), name = opt(p[18]), kills = num(p[19]) } end
@@ -569,9 +588,21 @@ function F.Unseen()
     return n
 end
 
-function F.Avenged(id)
+-- kind "player" or "mob"; the friend's record carries it, so a friend who missed the message sees it later.
+function F.Avenged(id, kind, name, class, zone, npc)
+    local s, now = store(), time()
+    s.avenged, s.lastAvenged = (s.avenged or 0) + 1, { id = id, time = now }
+    s.avengedFor = s.avengedFor or {}
+    s.avengedFor[id] = { time = now, kind = kind, name = name, class = class, zone = zone, npc = npc }
+    return now
+end
+
+-- The last time a friend avenged you, by their clock, so the same avenge never shows twice.
+function F.AvengeSeen(id, at)
     local s = store()
-    s.avenged, s.lastAvenged = (s.avenged or 0) + 1, { id = id, time = time() }
+    s.avengeSeen = s.avengeSeen or {}
+    if at then s.avengeSeen[id] = math.max(s.avengeSeen[id] or 0, at) end
+    return s.avengeSeen[id] or 0
 end
 
 function F.MarkSeen() for _, e in ipairs(store().recent) do e.seen = true end end

@@ -479,8 +479,12 @@ end
 C_ChatInfo.RegisterAddonMessagePrefix(L.PREFIX)
 
 local GREET_AFTER = 5
+local inBattle = false
+-- No addon message crosses a battleground's walls: leaving one, greet every friend again to catch up.
 ns.OnEvent("PLAYER_ENTERING_WORLD", function()
-    C_Timer.After(GREET_AFTER, function() L.Greet() end)
+    local left = inBattle and not ns.InBattle()
+    inBattle = ns.InBattle()
+    C_Timer.After(GREET_AFTER, function() L.Greet(left) end)
 end)
 ns.OnEvent("CHAT_MSG_ADDON", function(prefix, text, channel, sender)
     if prefix ~= L.PREFIX then return end

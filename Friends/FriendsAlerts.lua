@@ -293,29 +293,60 @@ ns.OnEvent("PARTY_KILL", function(attacker, target)
     if issecretvalue(target) or issecretvalue(attacker) or attacker ~= UnitGUID("player") then return end
     local _, npc = ns.ParseGUID(target)
     if not npc then return end
+    local avenged = false
     for _, id in ipairs(F.NemesisOf(npc)) do
         local rec = F.Store().players[id]
         local zone = GetRealZoneText() or ""
         if not F.InGroup(id) then
-            L.SendTo(id, ("G^%s^%d^%s"):format(F.Me(), npc, zone:gsub("%^", "")), function()
-                local mob = F.Char(rec, F.Known(id).char).nemName
-                F.AddEvent({ kind = "avengedBy", id = id, mob = mob, npc = npc, zone = zone })
-                F.Avenged(id)
-                ns.Trophies.Fact("avenger", { id = id })
-                FA.YouAvenged(FA.ClassName(id),
-                    UI.Muted("Killed ") .. UI.MobName(mob or "?") .. UI.Muted(", their nemesis"))
-            end)
+            local mob = F.Char(rec, F.Known(id).char).nemName
+            local at = F.Avenged(id, "mob", mob or "?", nil, zone, npc)
+            F.AddEvent({ kind = "avengedBy", id = id, mob = mob, npc = npc, zone = zone })
+            ns.Trophies.Fact("avenger", { id = id })
+            FA.YouAvenged(FA.ClassName(id), UI.Muted("Killed ") .. UI.MobName(mob or "?") .. UI.Muted(", their nemesis"))
+            L.SendTo(id, ("G^%s^%d^%s^%d"):format(F.Me(), npc, F.Clean(zone), at))
+            avenged = true
         end
     end
+    if avenged then C_Timer.After(1, L.Broadcast) end
 end)
+
+local function nemesisAvenged(id, name)
+    FA.AvengedYou(FA.ClassName(id), UI.Muted("Killed ") .. UI.MobName(name) .. UI.Muted(", your nemesis. Its bounty is still yours."))
+    ns.Trophies.Fact("avenged", { id = id })
+end
 
 L.On("G", function(id, p)
     local npc, name = ns.CharacterNemesis()
-    if not npc or npc ~= tonumber(p[3]) or ns.InBattle() or F.InGroup(id) then return end
+    local at = tonumber(p[5])
+    if ns.InBattle() or (at and at <= F.AvengeSeen(id)) then return end
+    F.AvengeSeen(id, at)
+    if not npc or npc ~= tonumber(p[3]) or F.InGroup(id) then return end
     F.AddEvent({ kind = "avenged", id = id, mob = name, npc = npc, zone = p[4] })
-    FA.AvengedYou(FA.ClassName(id), UI.Muted("Killed ") .. UI.MobName(name) .. UI.Muted(", your nemesis. Its bounty is still yours."))
-    ns.Trophies.Fact("avenged", { id = id })
+    nemesisAvenged(id, name)
 end)
+
+-- A friend avenged you while their message couldn't reach you (you were offline or in a battleground):
+-- their record says so once it catches up.
+FA.LATE_POPUP = 86400
+function FA.LateAvenge(rec)
+    local a = rec.avengedFor and rec.avengedFor[F.Me()]
+    if not a or not a.name or ns.InBattle() or a.time <= F.AvengeSeen(rec.id) then return end
+    F.AvengeSeen(rec.id, a.time)
+    local popup = time() - a.time < FA.LATE_POPUP
+    if a.kind == "player" then
+        local n = #ns.Deaths({ player = a.name, since = time() - ns.Grudge.DAYS * 86400, noBattle = true })
+        if n == 0 then return end
+        F.AddEvent({ kind = "avenged", id = rec.id, player = a.name, class = a.class, n = n, time = a.time, zone = a.zone })
+        if popup then ns.Revenge.ShowAvenged(FA.ClassName(rec.id), a.name, a.class, n) end
+        ns.Trophies.Fact("avenged", { id = rec.id })
+    else
+        local npc = ns.CharacterNemesis()
+        if not npc or npc ~= a.npc or F.InGroup(rec.id) then return end
+        F.AddEvent({ kind = "avenged", id = rec.id, mob = a.name, npc = npc, time = a.time, zone = a.zone })
+        if popup then nemesisAvenged(rec.id, a.name) else ns.Trophies.Fact("avenged", { id = rec.id }) end
+    end
+end
+L.On("record", FA.LateAvenge)
 
 L.On("P", function(id, p)
     local at = tonumber(p[3])
